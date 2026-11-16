@@ -1,0 +1,62 @@
+code,name,status,opening,open_year,lat,lon,coord_source,source
+TE30,Bedok South,under construction,26 Dec 2026,2026.98,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/11/news-releases/tel5-dtl3e-passenger-service-26-dec-2026.html
+TE31,Sungei Bedok,under construction,26 Dec 2026,2026.98,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/11/news-releases/tel5-dtl3e-passenger-service-26-dec-2026.html
+DT36,Xilin,under construction,26 Dec 2026,2026.98,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/11/news-releases/tel5-dtl3e-passenger-service-26-dec-2026.html
+DT37,Sungei Bedok,under construction,26 Dec 2026,2026.98,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/11/news-releases/tel5-dtl3e-passenger-service-26-dec-2026.html
+TE22A,Founders' Memorial,under construction,2028 (with Founders' Memorial),2028.5,,,URA MP2019,https://sgtrains.com/network.html
+TE10,Mount Pleasant,built - not yet opened,TBA (with estate),2030,,,URA MP2019,https://sgtrains.com/network.html
+TE21,Marina South,built - not yet opened,TBA (with Marina South),2032,1.2742,103.86282,URA MP2019 (unnamed polygon),https://sgtrains.com/network.html
+CC18,Bukit Brown,built - not yet opened,TBA,2040,,,URA MP2019,https://en.wikipedia.org/wiki/Bukit_Brown_MRT_station
+JS1,Choa Chu Kang,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS2,Choa Chu Kang West,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS2A,JS2A (Tengah Forest Drive),planned,mid-2030s,2035,1.3730,103.7350,approx (Forest Dr / Tengah Way),https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS3,Tengah,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS4,Hong Kah,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS5,Corporation,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS6,Jurong West,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS7,Bahar Junction,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS8,Boon Lay,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JW1,Gek Poh,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JW2,Tawas,under construction,mid-2028 (JRL Stage 1),2028.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JE1,Tengah Plantation,under construction,TBA (JRL Stage 2),2029.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JE2,Tengah Park,under construction,TBA (JRL Stage 2),2029.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JE3,Bukit Batok West,under construction,TBA (JRL Stage 2),2029.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JE4,Toh Guan,under construction,TBA (JRL Stage 2),2029.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JE5,Jurong East,under construction,TBA (JRL Stage 2),2029.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JE6,Jurong Town Hall,under construction,TBA (JRL Stage 2),2029.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JE7,Pandan Reservoir,under construction,TBA (JRL Stage 2),2029.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS9,Enterprise,under construction,TBA (JRL Stage 3),2030.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS10,Tukang,under construction,TBA (JRL Stage 3),2030.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS11,Jurong Hill,under construction,TBA (JRL Stage 3),2030.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JS12,Jurong Pier,under construction,TBA (JRL Stage 3),2030.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JW3,Nanyang Gateway,under construction,TBA (JRL Stage 3),2030.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JW4,Nanyang Crescent,under construction,TBA (JRL Stage 3),2030.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+JW5,Peng Kang Hill,under construction,TBA (JRL Stage 3),2030.5,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR2,Aviation Park,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR3,Loyang,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR4,Pasir Ris East,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR5,Pasir Ris,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR6,Tampines North,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR7,Defu,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR8,Hougang,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR9,Serangoon North,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR10,Tavistock,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR11,Ang Mo Kio,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR12,Teck Ghee,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR13,Bright Hill,under construction,2030 (CRL Phase 1),2030,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR14,Turf City,under construction,2032 (CRL Phase 2),2032,1.3378,103.7932,approx,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR15,King Albert Park,under construction,2032 (CRL Phase 2),2032,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR16,Maju,under construction,2032 (CRL Phase 2),2032,1.3268,103.7700,approx,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR17,Clementi,under construction,2032 (CRL Phase 2),2032,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR18,West Coast,under construction,2032 (CRL Phase 2),2032,1.3005,103.7655,approx,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR19,Jurong Lake District,under construction,2032 (CRL Phase 2),2032,1.3352,103.7290,approx,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CP1,Pasir Ris,under construction,2032 (CRL Punggol Extension),2032,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CP2,Elias,under construction,2032 (CRL Punggol Extension),2032,1.3815,103.9440,approx,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CP3,Riviera,under construction,2032 (CRL Punggol Extension),2032,1.3945,103.9161,approx (Riviera LRT),https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CP4,Punggol,under construction,2032 (CRL Punggol Extension),2032,,,URA MP2019,https://www.lta.gov.sg/content/ltagov/en/newsroom/2026/3/news-releases/next-phase-of-rail-development.html
+CR20,CR20 (Taman Jurong),planned,late 2030s (CRL Phase 3),2038,1.3355,103.7200,approx,https://landtransportguru.net/cross-island-line-phase-3-announced/
+CR21,Jurong Pier,planned,late 2030s (CRL Phase 3),2038,,,URA MP2019,https://landtransportguru.net/cross-island-line-phase-3-announced/
+CR22,CR22 (Jurong Industrial),planned,late 2030s (CRL Phase 3),2038,1.3170,103.6870,approx,https://landtransportguru.net/cross-island-line-phase-3-announced/
+CR23,Gul Circle,planned,late 2030s (CRL Phase 3),2038,,,URA MP2019,https://landtransportguru.net/cross-island-line-phase-3-announced/
+NS3A,Brickland,planned,2034,2034,1.3705,103.7465,approx,https://sgtrains.com/network.html
+NS6,Sungei Kadut,planned,2035,2035,1.4135,103.7495,approx,https://sgtrains.com/network.html

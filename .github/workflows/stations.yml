@@ -1,0 +1,31 @@
+name: Rebuild station list
+
+# Run by hand after editing data/manual/planned_stations.csv (e.g. when LTA announces new stations).
+on:
+  workflow_dispatch:
+  push:
+    paths: ["data/manual/planned_stations.csv", "scripts/build_stations.py"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: git clone --depth 1 https://github.com/cheeaun/sgraildata /tmp/sgraildata
+      - run: |
+          python scripts/build_stations.py \
+            --rail /tmp/sgraildata/data/v1/sg-rail.geojson \
+            --mp19 "/tmp/sgraildata/data/raw/master-plan-2019-rail-station-layer-geojson.geojson"
+      - run: pip install requests && python scripts/analyse.py
+      - run: |
+          git config user.name "sg-transit-planner-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data
+          git diff --cached --quiet || git commit -m "stations: rebuild"
+          git push

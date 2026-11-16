@@ -1,0 +1,47 @@
+name: Data bot
+
+# Daily 06:17 SGT: today's LTA crowd forecast + live crowd, new monthly passenger volumes when LTA publishes them,
+# HDB blocks (geocoding resumes until every block is located), then re-run the analysis and commit.
+on:
+  schedule:
+    - cron: "17 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-bot
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+
+      - name: LTA DataMall (crowd + passenger volume)
+        env:
+          LTA_ACCOUNT_KEY: ${{ secrets.LTA_ACCOUNT_KEY }}
+        run: python scripts/fetch_lta.py
+        continue-on-error: true
+
+      - name: HDB blocks (data.gov.sg + OneMap geocoding)
+        run: python scripts/fetch_hdb.py
+        continue-on-error: true
+
+      - name: Gap analysis + proposed lines
+        run: python scripts/analyse.py
+
+      - name: Commit data
+        run: |
+          git config user.name "sg-transit-planner-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data docs/data
+          git diff --cached --quiet || git commit -m "data: $(TZ=Asia/Singapore date +'%Y-%m-%d %H:%M') SGT"
+          git push
