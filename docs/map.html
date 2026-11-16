@@ -46,7 +46,7 @@
   <div class="stats" id="stats"></div>
   <h2>Proposed lines</h2>
   <div id="lines"></div>
-  <h2>Infill stations</h2>
+  <h2>Single new stations</h2>
   <div id="infill" class="mute"></div>
   <h2>Already fixed by LTA's plans</h2>
   <div id="fixed" class="mute"></div>
@@ -115,7 +115,7 @@ function drawAnalysis() {
         .bindPopup(`<b>${p.name}</b><br>${l.name}`).addTo(G.prop));
     });
     AN.infill.forEach(s => L.circleMarker([s.lat,s.lon], {radius:7, color:'#ff4fd8', weight:3, fillColor:'#fff', fillOpacity:1})
-      .bindPopup(`<b>Infill: ${s.area}</b><br>${s.line}, between ${s.between.join(' and ')}<br>${fmt(s.new_residents)} residents within 10-min walk`).addTo(G.prop));
+      .bindPopup(`<b>New station: ${s.area}</b><br>${s.type === 'infill' ? 'infill on ' + s.line + ', between ' + s.between.join(' and ') : 'spur/extension from ' + s.between.join(' / ')}<br>${fmt(s.new_residents)} residents within 10-min walk`).addTo(G.prop));
   }
   if (document.getElementById('lyFuture').checked && AN.future)
     AN.future.forEach(f => L.marker([f.lat, f.lon], {icon: L.divIcon({className:'', html:`<div style="background:${f.type==='BTO'?'#f2c14e':'#4fb3ff'};color:#111;font:600 10px system-ui;padding:1px 4px;border-radius:4px;white-space:nowrap">${f.type} ${fmt(f.units)}</div>`})})
@@ -138,7 +138,7 @@ function panel() {
     : '<div class="mute">No new line clears the threshold yet.</div>';
   document.querySelectorAll('.line').forEach(el => el.onclick = () => {
     const l = AN.lines[+el.dataset.i]; map.fitBounds(l.stations.map(p => [p.lat,p.lon]), {padding:[40,40]}); });
-  document.getElementById('infill').innerHTML = AN.infill.map(s => `★ ${s.area}: ${s.line} between ${s.between.join(' & ')} — ${fmt(s.new_residents)} residents`).join('<br>') || 'None.';
+  document.getElementById('infill').innerHTML = AN.infill.map(s => s.type === 'infill' ? `★ ${s.area}: infill on ${s.line} between ${s.between.join(' & ')} — ${fmt(s.new_residents)} residents` : `★ ${s.area}: spur or extension from ${s.between.join(' / ')} — ${fmt(s.new_residents)} residents`).join('<br>') || 'None.';
   document.getElementById('fixed').innerHTML = AN.fixed_by_lta_plans.slice(0, 10).map(f => `${f.station}: ${fmt(f.residents)} residents`).join('<br>') || '–';
   const P = AN.params;
   document.getElementById('method').innerHTML =
