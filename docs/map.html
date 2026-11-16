@@ -125,7 +125,7 @@ function drawAnalysis() {
 function panel() {
   const s = AN.summary, inp = AN.inputs;
   let b = '';
-  if (!inp.hdb_blocks) b += '<div class="banner">HDB block data is still loading (the daily bot geocodes ~4,000 blocks per run). Until then, gaps and proposals use only the new BTO and land-sale sites.</div>';
+  if (!inp.hdb_blocks) b += '<div class="banner">HDB block data has not loaded yet. Until then, gaps and proposals use only the new BTO and land-sale sites.</div>';
   if (!inp.lta_passenger_volume && !inp.lta_crowd_forecast) b += '<div class="banner">LTA crowd data not loaded yet — add the LTA_ACCOUNT_KEY secret. Crowding is not weighted in until then.</div>';
   document.getElementById('banner').innerHTML = b;
   document.getElementById('stats').innerHTML = [

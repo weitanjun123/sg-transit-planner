@@ -31,7 +31,7 @@ jobs:
         run: python scripts/fetch_lta.py
         continue-on-error: true
 
-      - name: HDB blocks (data.gov.sg + OneMap geocoding)
+      - name: HDB blocks (data.gov.sg property info + building footprints)
         run: python scripts/fetch_hdb.py
         continue-on-error: true
 

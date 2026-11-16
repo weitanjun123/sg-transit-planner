@@ -19,7 +19,7 @@ It also includes a **2D pixel MRT simulation**. You can watch trains fill up thr
 | `data/manual/future_housing.csv` | 2026 BTO launches (Feb, Jun, Oct) and 2H2026 Government Land Sales sites, with units and source links. Coordinates are approximate |
 | `scripts/build_stations.py` | Merges LTA station points, URA Master Plan 2019 station layer and the planned list → `docs/data/stations.json` (stations + track links + study corridors) |
 | `scripts/fetch_lta.py` | LTA DataMall: monthly passenger volume per station per hour, plus today's platform crowd forecast and the live crowd level |
-| `scripts/fetch_hdb.py` | data.gov.sg HDB Property Information (all ~13k blocks) + OneMap geocoding (cached, resumable) |
+| `scripts/fetch_hdb.py` | data.gov.sg HDB Property Information (all ~13k blocks) joined to HDB building footprints (block no + town) |
 | `scripts/analyse.py` | Gap analysis + greedy station siting + line building → `docs/data/analysis.json` |
 | `docs/` | GitHub Pages site: `map.html` (Leaflet), `sim.html` (canvas pixel sim) |
 | `.github/workflows/data.yml` | Daily data bot (06:17 SGT) |
@@ -43,7 +43,7 @@ Train loads are **estimates**. LTA publishes tap-ins and tap-outs per station pe
 pip install requests
 export LTA_ACCOUNT_KEY=...   # free: https://datamall.lta.gov.sg/content/datamall/en/request-for-api.html
 python scripts/fetch_lta.py
-python scripts/fetch_hdb.py     # first run geocodes in batches of 4,000 blocks
+python scripts/fetch_hdb.py
 python scripts/analyse.py
 cd docs && python -m http.server   # open http://localhost:8000
 ```
@@ -52,7 +52,7 @@ cd docs && python -m http.server   # open http://localhost:8000
 - LTA DataMall: passenger volume by train station, platform crowd density (real-time and forecast)
 - URA Master Plan 2019 Rail Station layer (data.gov.sg, Singapore Open Data Licence)
 - HDB Property Information (data.gov.sg, Singapore Open Data Licence)
-- OneMap (SLA) search API for geocoding
+- HDB Existing Buildings footprints (data.gov.sg) to locate each block
 - LTA station points via [cheeaun/sgraildata](https://github.com/cheeaun/sgraildata)
 - LTA, URA and HDB press releases for planned stations, BTO launches and land sales (linked per row)
 
