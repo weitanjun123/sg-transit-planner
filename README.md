@@ -27,7 +27,7 @@ It also includes a **2D pixel MRT simulation**. You can watch trains fill up thr
 ## Method (short)
 
 1. **Residents.** HDB dwelling units × 3.1 people per unit, summed on a 300 m grid. Future BTO and land-sale units are added at their sites.
-2. **Served.** A home counts as served if an MRT station is within ~640 m straight-line (≈800 m walk ≈ 10 minutes). The check is done twice: once against today's network and once against all stations LTA has announced.
+2. **Served.** A home counts as served if an MRT station is within ~800 m straight line of its centre (about a 10-minute walk to the nearest entrance). The check is done twice: once against today's network and once against all stations LTA has announced.
 3. **Crowding.** Unserved residents are weighted by up to 2× when their current nearest station is busy in the 07:00–09:00 peak. This uses LTA tap-in volumes and LTA's platform crowd forecast.
 4. **Siting.** New stations are placed greedily where they serve the most weighted unserved residents. Each one must be at least 1 km from every existing or planned station and serve at least 6,000 people.
 5. **Lines.** New sites up to 3 km apart are chained, with no sharp turns, and both ends are tied into the nearest MRT station as interchanges. A single site sitting on an existing line becomes an infill station.
@@ -60,3 +60,8 @@ cd docs && python -m http.server   # open http://localhost:8000
 New LTA announcement? Edit `data/manual/planned_stations.csv` (add the source link) and the station list rebuilds automatically. New BTO launch or land-sale site? Add a row to `data/manual/future_housing.csv`.
 
 MIT licensed.
+
+## Known limitations
+- Residents come from HDB blocks (~80% of residents). Condos and landed homes are only included through new Government Land Sales sites, so private estates (e.g. parts of Bukit Timah, Upper Thomson, East Coast) are under-counted.
+- Blocks are located by joining block number + town to HDB building footprints. A small share that cannot be matched is skipped (the bot log prints how many).
+- Straight-line distance, not walking routes. LRT stations count as half coverage, since LRT riders still have to change trains.

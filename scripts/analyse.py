@@ -11,7 +11,8 @@ Output
 
 Method (all parameters in PARAMS, printed into the output so anyone can reproduce/tune):
  1. residents = dwelling units x average household size, on a 300 m grid
- 2. a cell is "served" if an MRT station is within a 10-minute walk (800 m walk ~ 640 m straight line)
+ 2. a cell is "served" if an MRT station is within ~800 m straight line of its centre (about a 10-minute walk
+    to the nearest station entrance; entrances sit up to ~200 m from the station centre point)
  3. unserved residents are weighted up when their current nearest station is crowded in the AM peak
  4. greedy siting: repeatedly place a new station where it would serve the most weighted unserved residents,
     at least 1 km from any existing/planned station, until a station would serve too few people
@@ -22,9 +23,9 @@ import csv, json, math, os, datetime as dt
 from collections import defaultdict
 
 PARAMS = {
-    "grid_m": 300, "persons_per_unit": 3.1, "walk_radius_m": 640, "lrt_counts_as": 0.5,
+    "grid_m": 300, "persons_per_unit": 3.1, "walk_radius_m": 800, "lrt_counts_as": 0.5,
     "min_site_spacing_m": 1000, "min_new_residents": 6000, "max_link_m": 3000, "max_turn_deg": 70,
-    "max_tie_in_m": 3500, "infill_max_offset_m": 450, "crowd_weight": 1.0,
+    "max_tie_in_m": 3500, "infill_max_offset_m": 700, "crowd_weight": 1.0,
 }
 D = "docs/data"
 LAT0, LON0 = 1.3521, 103.8198
@@ -192,7 +193,10 @@ def main():
             relieved[weight[cand[j]][2]] += weight[cand[j]][1]
             covered.add(cand[j])
         town = max(towns, key=towns.get) if towns and max(towns.values()) > 0 else ""
-        label = town or (sorted(names)[0] if names else "")
+        jn, dn = nearest(x, y, P_now)
+        ns = mrt_now[jn]; sx, sy = xy(ns["lat"], ns["lon"])
+        comp = ["E", "NE", "N", "NW", "W", "SW", "S", "SE"][int(((math.degrees(math.atan2(y - sy, x - sx)) + 22.5) % 360) // 45)]
+        label = f"{town or (sorted(names)[0] if names else 'site')} ({dn/1000:.1f} km {comp} of {ns['name']})"
         lat, lon = ll(x, y)
         sid = {s["id"]: s for s in stations}
         sites.append({"id": len(sites) + 1, "lat": lat, "lon": lon, "area": label, "new_residents": round(pop),
@@ -271,6 +275,12 @@ def main():
             ends.append(mrt_all[best[1]] if best else None)
         if len(chain) == 1 and ends[0] and ends[1] and ends[0]["id"] == ends[1]["id"]:
             ends[1] = None
+        if len(chain) == 1 and not (ends[0] and ends[1]):
+            site = next(s for s in sites if s["id"] == chain[0])
+            site["type"] = "single"
+            site["line"] = "new station or short spur"
+            site["between"] = [e["name"] for e in ends if e] or ["-"]
+            infill.append(site); continue
         if not any(ends):
             continue
         path = []
