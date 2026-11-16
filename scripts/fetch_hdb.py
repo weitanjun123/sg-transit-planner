@@ -12,6 +12,7 @@ DATASET = "d_17f5382f26140b1fdae0ba2ef6239d2f"
 RAW = "data/raw"
 CACHE = f"{RAW}/geocode_cache.json"
 MAX_LOOKUPS = int(os.environ.get("MAX_GEOCODE", "4000"))  # OneMap allows ~250 calls/min
+TIME_BUDGET = int(os.environ.get("GEOCODE_SECONDS", "1500"))  # stop early so the run always gets to commit
 
 
 def fetch_property_info():
@@ -53,10 +54,10 @@ def main():
     os.makedirs(RAW, exist_ok=True); os.makedirs("docs/data", exist_ok=True)
     recs = [r for r in fetch_property_info() if r.get("residential") == "Y"]
     cache = json.load(open(CACHE)) if os.path.exists(CACHE) else {}
-    s, done = requests.Session(), 0
+    s, done, t0 = requests.Session(), 0, time.time()
     for r in recs:
         k = f"{r['blk_no']}|{r['street']}"
-        if k in cache or done >= MAX_LOOKUPS:
+        if k in cache or done >= MAX_LOOKUPS or time.time() - t0 > TIME_BUDGET:
             continue
         g = geocode(r["blk_no"], r["street"], s)
         if g == "retry":
