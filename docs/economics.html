@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner — Does it make financial sense?</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --blue:#5aa9ff; --red:#e5484d; --green:#3fbf7f; --line:#2b3038; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:18px 14px 70px; }
+  h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:18px; margin:32px 0 4px; } h3 { font-size:14px; margin:8px 0 6px; }
+  a { color:var(--gold); } .mute { color:var(--mute); font-size:13px; } .lead { color:#cfd5de; margin:4px 0 10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; overflow-x:auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { padding:6px 5px; border-bottom:1px solid var(--line); text-align:right; vertical-align:top; }
+  td:first-child, th:first-child { text-align:left; } th { color:var(--mute); font-weight:500; }
+  .good { color:var(--green); font-weight:600; } .bad { color:var(--red); font-weight:600; } .mid { color:var(--gold); font-weight:600; }
+  .big { font-size:24px; font-weight:700; }
+  .pill { display:inline-block; border-radius:10px; padding:1px 8px; font-size:12px; background:#2c313b; }
+  details { margin-top:8px; } summary { cursor:pointer; color:var(--gold); }
+</style>
+</head>
+<body><main>
+  <h1>Does it make financial sense?</h1>
+  <div class="mute"><a href="./">home</a> · <a href="map.html">gap map</a> · <a href="insights.html">deep dive</a> · <a href="prices.html">home prices</a></div>
+  <p class="lead">Every idea is scored in money: what it costs, and what it gives back in commuters' time, buses no longer needed and running costs saved. Costs come from published LTA/MOT figures where they exist. Where they don't, the number is labelled an assumption and can be changed in <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/data/manual/costs.json">costs.json</a>.</p>
+  <div class="grid" id="head"></div>
+
+  <h2>1 · New lines and stations: benefit vs cost</h2>
+  <p class="lead">Benefit = minutes saved by newly served residents (valued at half the median wage) + feeder buses no longer needed, over <span id="yrs"></span> years. A ratio above 1.0 means the benefits outweigh the cost. Land value uplift is shown separately as a way to <i>fund</i> the project, not added to the benefit, since it is largely the same benefit showing up in home prices.</p>
+  <div class="card"><table id="proj"></table></div>
+
+  <h2>3 · More trains on the most crowded stretches</h2>
+  <p class="lead">For each line: the busiest stretch in the rush hour, how full its busiest 15 minutes get, and how many extra trains would keep it under the target.</p>
+  <div class="card"><table id="trains"></table></div>
+
+  <h2>4 · Bus-to-MRT hotspots: infill station or express bus?</h2>
+  <p class="lead">For the 15 biggest clusters of people bussing to the MRT each morning: an infill station on a nearby line (only possible if the line passes within 800 m) vs a direct express bus, both over the full appraisal period.</p>
+  <div class="card"><table id="hot"></table></div>
+
+  <h2>6 · Trains running nearly empty</h2>
+  <p class="lead">Hours when even the fullest stretch of a line is under 25% full. Running trains a little less often (never more than 8 minutes apart) saves running cost, minus the value of riders' extra waiting.</p>
+  <div class="card"><table id="lean"></table></div>
+
+  <h2>8 · One more hour of trains on Friday and Saturday nights</h2>
+  <div class="grid" id="late"></div>
+
+  <h2>Assumptions</h2>
+  <div class="card"><table id="ass"></table></div>
+  <p class="mute">This is a screening model: straight-line distances, routed trip estimates and round numbers. It is meant to rank options and show where the money is, not to replace a full LTA appraisal. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/economics.py">scripts/economics.py</a>.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
+const money = n => n == null ? '–' : (Math.abs(n) >= 1e9 ? `$${(n / 1e9).toFixed(2)}b` : Math.abs(n) >= 1e6 ? `$${(n / 1e6).toFixed(1)}m` : `$${fmt(n)}`);
+const cls = r => r == null ? '' : r >= 1 ? 'good' : r >= 0.5 ? 'mid' : 'bad';
+(async () => {
+  const E = await (await fetch('data/economics.json', {cache:'no-store'})).json();
+  $('yrs').textContent = E.assumptions.appraisal_years.value;
+  const best = E.projects[0], ln = E.late_night, tr = E.trains[0], lean = E.lean_lines.reduce((a, x) => a + x.net_per_year, 0);
+  $('head').innerHTML = [
+    `<div class="card"><div class="mute">Best value rail option</div><div class="big ${cls(best.bcr)}">${best.bcr}×</div>${best.name}: ${money(best.cost)} for ${fmt(best.daily_trips)} trips a day</div>`,
+    `<div class="card"><div class="mute">New lines</div><div class="big bad">${Math.min(...E.projects.filter(p => p.kind === 'new line').map(p => p.bcr))}–${Math.max(...E.projects.filter(p => p.kind === 'new line').map(p => p.bcr))}×</div>At ~$0.8b per km (underground, Cross Island Line prices) no new rail option pays back on time savings alone. Rail needs its wider benefits (crowding relief, new development, reliability) to justify it; express buses for the hotspots already pay off.</div>`,
+    `<div class="card"><div class="mute">Running fewer near-empty trains</div><div class="big good">${money(lean)}/yr</div>net saving, after riders' extra waiting, <i>if</i> today's gaps between trains are as assumed and a train-hour costs ~$${fmt(E.assumptions.train_cost_per_train_hour.value)}.</div>`,
+    `<div class="card"><div class="mute">Late-night extra hour</div><div class="big ${cls(ln?.bcr)}">${ln ? ln.bcr + '×' : '–'}</div>${ln ? `about ${fmt(ln.estimated_riders_extra_hour)} riders a night for ${money(ln.running_cost_per_night)}` : ''}</div>`].join('');
+  $('proj').innerHTML = '<tr><th>Option</th><th>Cost</th><th>New residents served</th><th>Trips a day</th><th>Time saved a year</th><th>Buses freed</th><th>Benefit ÷ cost</th><th>Land uplift (could fund)</th></tr>' +
+    E.projects.map(p => `<tr><td>${p.name}<br><span class="mute">${p.kind === 'new line' ? `new line, ${p.length_km} km, ${p.stations} new stations` : p.kind}</span></td><td>${money(p.cost)}</td><td>${fmt(p.new_residents)}</td><td>${fmt(p.daily_trips)}</td><td>${money(p.time_saved_per_year)}</td><td>${p.buses_freed}</td><td class="${cls(p.bcr)}">${p.bcr}×</td><td>${money(p.land_value_uplift)}<br><span class="mute">${Math.round(p.uplift_share_of_cost * 100)}% of cost</span></td></tr>`).join('');
+  $('trains').innerHTML = '<tr><th>Line</th><th>Busiest stretch</th><th>People / hour</th><th>Busiest 15 min</th><th>Trains / hour now → needed</th><th>Extra trains</th><th>Cost</th></tr>' +
+    E.trains.map(t => `<tr><td>${t.line}</td><td>${t.worst_stretch}<br><span class="mute">${t.hour}</span></td><td>${fmt(t.people_per_hour)}</td><td class="${t.busiest_15min_pct > 85 ? 'bad' : t.busiest_15min_pct > 70 ? 'mid' : 'good'}">${t.busiest_15min_pct}%</td><td>${t.trains_per_hour_now} → ${t.trains_per_hour_needed}</td><td>${t.extra_trains}${t.hits_signalling_limit ? ' <span class="pill">signalling limit</span>' : ''}</td><td>${t.extra_trains ? money(t.capex) + ` + ${money(t.opex_per_year)}/yr` : 'none needed'}</td></tr>`).join('') +
+    '<tr><td colspan="7" class="mute">"Busiest 15 min" is the % of crush capacity (all standing space used), estimated from routed trips. Target: under 85%.</td></tr>';
+  $('hot').innerHTML = '<tr><th>Area</th><th>Feeder trips / morning</th><th>km to MRT</th><th>Infill station (net value)</th><th>Express bus (net value)</th><th>Best option</th></tr>' +
+    E.hotspots.map(h => `<tr><td>${h.town}<br><span class="mute">${h.lat.toFixed(4)}, ${h.lon.toFixed(4)}</span></td><td>${fmt(h.feeder_trips_per_day)}</td><td>${h.km_to_mrt}</td><td>${h.infill_possible ? money(h.infill_npv) + `<br><span class="mute">between ${h.infill_between.join(' & ')}</span>` : '<span class="mute">no line close enough</span>'}</td><td>${money(h.express_bus_npv)}<br><span class="mute">${h.express_bus_buses} buses</span></td><td><b>${h.verdict}</b></td></tr>`).join('');
+  $('lean').innerHTML = '<tr><th>Line</th><th>Days</th><th>Hours</th><th>Net saving a year</th></tr>' +
+    E.lean_lines.map(x => `<tr><td>${x.line}</td><td>${x.day}</td><td>${x.hours.sort((a, b) => parseInt(a) - parseInt(b)).join(', ')}</td><td class="good">${money(x.net_per_year)}</td></tr>`).join('') +
+    '<tr><td colspan="4" class="mute">Today\'s gaps between trains are assumed (about 4.5 min off-peak, 5.5–7 min late evening); real timetables vary by line, so treat these as where to look, not exact savings.</td></tr>';
+  if (ln) $('late').innerHTML = `<div class="card"><h3>Whole network, ~1 extra hour</h3><div>About <b>${fmt(ln.estimated_riders_extra_hour)}</b> riders a night (from how fast tap-ins fall off after midnight on weekends) against <b>${fmt(ln.trains_in_service)}</b> trains running.</div>
+      <div style="margin-top:6px">${money(ln.running_cost_per_night)} a night = <b>$${ln.cost_per_extra_rider}</b> per rider, vs a ~$${ln.taxi_alternative} taxi. Benefit ÷ cost <span class="${cls(ln.bcr)}">${ln.bcr}×</span>, ${money(ln.net_per_year)} a year.</div></div>
+    <div class="card"><h3>North-South Line only</h3><div>${ln.north_south_only.share_of_late_riders}% of after-midnight riders head to NSL stations (top: ${ln.top_late_destinations.slice(0, 4).join(', ')}).</div>
+      <div style="margin-top:6px">${fmt(ln.north_south_only.riders)} riders for ${money(ln.north_south_only.cost_per_night)} a night: ratio <span class="${cls(ln.north_south_only.bcr)}">${ln.north_south_only.bcr}×</span>. A late night bus along the NSL corridor would likely be the cheaper way to serve them.</div></div>
+    <div class="card"><h3>Catch</h3><div class="mute">${ln.caveat}</div></div>`;
+  $('ass').innerHTML = '<tr><th>Item</th><th>Value</th><th>Type</th></tr>' + Object.entries(E.assumptions).map(([k, v]) =>
+    `<tr><td>${k.replace(/_/g, ' ')}<br><span class="mute">${v.detail || ''}</span></td><td>${typeof v.value === 'number' && v.value >= 1000 ? fmt(v.value) : v.value}</td><td>${v.source ? `<a href="${v.source}" target="_blank">${v.kind}</a>` : v.kind}</td></tr>`).join('') +
+    `<tr><td>value of time per hour (derived)</td><td>$${E.value_of_time_per_hour}</td><td>median income ÷ hours × share</td></tr>`;
+})();
+</script>
+</body>
+</html>

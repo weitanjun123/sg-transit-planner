@@ -56,6 +56,10 @@ jobs:
         run: python scripts/prices.py
         continue-on-error: true
 
+      - name: Money test (cost vs benefit)
+        run: python scripts/economics.py
+        continue-on-error: true
+
       - name: Commit data
         run: |
           git config user.name "sg-transit-planner-bot"
