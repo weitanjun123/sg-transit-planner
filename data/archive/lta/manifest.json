@@ -1,0 +1,102 @@
+{
+ "files": {
+  "bus_od/202608.zip": {
+   "api": "PV/ODBus",
+   "bytes": 50791008,
+   "downloaded_sgt": "2026-11-17T19:44+08:00",
+   "month": "2026-08",
+   "sha256": "b3c6cae16be28c969fe88540d8637aa1ae08139928fa1b187c55b4777d55baab",
+   "stored": true
+  },
+  "bus_od/202609.zip": {
+   "api": "PV/ODBus",
+   "bytes": 48569089,
+   "downloaded_sgt": "2026-11-17T19:44+08:00",
+   "month": "2026-09",
+   "sha256": "447be2570d7fdc3b2530911278f70f3d32ddff88ec971421b1fe716199d138dc",
+   "stored": true
+  },
+  "bus_od/202610.zip": {
+   "api": "PV/ODBus",
+   "bytes": 49185164,
+   "downloaded_sgt": "2026-11-17T19:44+08:00",
+   "month": "2026-10",
+   "sha256": "911ae3381b3efaf60344a8c82ea0d908ec7bb38f7a10d32b57c4c87f0e153e3b",
+   "stored": true
+  },
+  "bus_stop/202608.zip": {
+   "api": "PV/Bus",
+   "bytes": 1806376,
+   "downloaded_sgt": "2026-11-17T19:44+08:00",
+   "month": "2026-08",
+   "sha256": "54022a2c4fbb42737ab0960d9899b8f21d2196d259e344a7bb44719a8015f1d4",
+   "stored": true
+  },
+  "bus_stop/202609.zip": {
+   "api": "PV/Bus",
+   "bytes": 1789529,
+   "downloaded_sgt": "2026-11-17T19:43+08:00",
+   "month": "2026-09",
+   "sha256": "80ffa7b5074649430c4533b57c0299ac8691f2122acc7eaff5727624f458180e",
+   "stored": true
+  },
+  "bus_stop/202610.zip": {
+   "api": "PV/Bus",
+   "bytes": 1800049,
+   "downloaded_sgt": "2026-11-17T19:43+08:00",
+   "month": "2026-10",
+   "sha256": "2a1baf567f1a0fa713535567e51c646a77b5981b49acf3cb6a369637d3d63368",
+   "stored": true
+  },
+  "train_od/202608.zip": {
+   "api": "PV/ODTrain",
+   "bytes": 6543767,
+   "downloaded_sgt": "2026-11-17T19:43+08:00",
+   "month": "2026-08",
+   "sha256": "aa308038639993bb2e69b6f8a71130312bae9237ca3c96ddaef113439a1ba06b",
+   "stored": true
+  },
+  "train_od/202609.zip": {
+   "api": "PV/ODTrain",
+   "bytes": 6378431,
+   "downloaded_sgt": "2026-11-17T19:43+08:00",
+   "month": "2026-09",
+   "sha256": "d45b050867d5ae36913fad3b8c4cd89025e771f40c9b0f146028011165298343",
+   "stored": true
+  },
+  "train_od/202610.zip": {
+   "api": "PV/ODTrain",
+   "bytes": 6563352,
+   "downloaded_sgt": "2026-11-17T19:43+08:00",
+   "month": "2026-10",
+   "sha256": "16979e1f151043e5adfe9424610d1110389380a5ecd531ac8ebac22eee56cc4a",
+   "stored": true
+  },
+  "train_station/202608.zip": {
+   "api": "PV/Train",
+   "bytes": 73163,
+   "downloaded_sgt": "2026-11-17T19:43+08:00",
+   "month": "2026-08",
+   "sha256": "27137d34735d3b911a178d63f861b5b6c467ab489bb688737b8c2c9ca38823b2",
+   "stored": true
+  },
+  "train_station/202609.zip": {
+   "api": "PV/Train",
+   "bytes": 72649,
+   "downloaded_sgt": "2026-11-17T19:43+08:00",
+   "month": "2026-09",
+   "sha256": "b1ca1a25e947ca2b80f416cb79971f418a4e6a46aeff8a2a049fabacbb7c7f50",
+   "stored": true
+  },
+  "train_station/202610.zip": {
+   "api": "PV/Train",
+   "bytes": 73234,
+   "downloaded_sgt": "2026-11-17T19:43+08:00",
+   "month": "2026-10",
+   "sha256": "daca4e7db49f093d8f2ddf463487d2c0252e8686a7b81a4b2ae4c75dc6b0499c",
+   "stored": true
+  }
+ },
+ "note": "Original LTA DataMall passenger-volume zips, one per dataset per month",
+ "updated_sgt": "2026-11-17T19:44+08:00"
+}
