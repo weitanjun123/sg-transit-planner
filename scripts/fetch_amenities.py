@@ -142,12 +142,13 @@ def main():
                                  params={"searchVal": "polyclinic", "returnGeom": "Y", "getAddrDetails": "Y", "pageNum": page}, timeout=30).json()
                 for x in r.get("results", []):
                     b = x.get("BUILDING", "")
-                    if b.upper().endswith("POLYCLINIC"):
+                    if "POLYCLINIC" in b.upper() and "CLINIC @" not in b.upper():
                         found[b] = [round(float(x["LATITUDE"]), 6), round(float(x["LONGITUDE"]), 6), b.title()]
                 if page >= int(r.get("totalNumPages", 1)):
                     break
                 page += 1; time.sleep(0.3)
-            if len(found) >= 15:
+            print(f"polyclinics: OneMap returned {len(found)} buildings over {page} pages: {sorted(found)[:40]}")
+            if len(found) >= 10:
                 json.dump(list(found.values()), open(pp, "w"))
         except Exception as e:
             print(f"polyclinics: {e}")
