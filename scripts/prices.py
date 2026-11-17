@@ -44,7 +44,6 @@ AMENITIES = [  # (key in points.json, label, radius km, how it enters the model)
     ("secondary_schools", "Secondary school within 1 km", 1.0, "any"),
     ("hawker", "Hawker centre within 500 m", 0.5, "any"),
     ("clinics", "GP clinics within 400 m", 0.4, "count5"),
-    ("polyclinics", "Polyclinic within 1 km", 1.0, "any"),
     ("hospitals", "Public hospital within 2 km", 2.0, "any"),
     ("parks", "Park within 400 m", 0.4, "any"),
 ]

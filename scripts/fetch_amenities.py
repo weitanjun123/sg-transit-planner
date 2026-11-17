@@ -132,28 +132,7 @@ def main():
         json.dump(cache, open(cp, "w"))
         pts["primary_schools"], pts["secondary_schools"] = prim, sec
         print(f"schools: {len(prim)} primary, {len(sec)} secondary located ({sum(1 for v in cache.values() if not v)} postal codes not found)")
-    # polyclinics: no current data.gov.sg list, so ask OneMap for every building named "... Polyclinic" (cached 30 days)
-    pp = f"{RAW}/polyclinics.json"
-    if not fresh(pp, 30):
-        found, page = {}, 1
-        try:
-            while page <= 20:
-                r = requests.get("https://www.onemap.gov.sg/api/common/elastic/search",
-                                 params={"searchVal": "polyclinic", "returnGeom": "Y", "getAddrDetails": "Y", "pageNum": page}, timeout=30).json()
-                for x in r.get("results", []):
-                    b = x.get("BUILDING", "")
-                    if "POLYCLINIC" in b.upper() and "CLINIC @" not in b.upper():
-                        found[b] = [round(float(x["LATITUDE"]), 6), round(float(x["LONGITUDE"]), 6), b.title()]
-                if page >= int(r.get("totalNumPages", 1)):
-                    break
-                page += 1; time.sleep(0.3)
-            print(f"polyclinics: OneMap returned {len(found)} buildings over {page} pages: {sorted(found)[:40]}")
-            if len(found) >= 10:
-                json.dump(list(found.values()), open(pp, "w"))
-        except Exception as e:
-            print(f"polyclinics: {e}")
-    if os.path.exists(pp):
-        pts["polyclinics"] = json.load(open(pp)); print(f"polyclinics: {len(pts['polyclinics'])} places")
+    # polyclinics: no current open list with locations (the data.gov.sg one is vaccination GP clinics, OneMap search misses them), so not used
     if os.path.exists("data/manual/hospitals.csv"):
         pts["hospitals"] = [[float(r["lat"]), float(r["lon"]), r["name"]] for r in csv.DictReader(open("data/manual/hospitals.csv"))]
     json.dump(pts, open(f"{RAW}/points.json", "w"), separators=(",", ":"))
