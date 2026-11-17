@@ -7,6 +7,8 @@ All archived months are pooled and turned into per-day averages (weekdays / week
 """
 import csv, glob, io, json, math, os, re, zipfile, datetime as dt
 from collections import defaultdict
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 SGT = dt.timezone(dt.timedelta(hours=8))
 MIN_DAILY = 2000          # stations with fewer weekday tap-ins per day are left out of the rankings
@@ -14,10 +16,9 @@ AM_HOURS = (6, 7, 8)      # morning commute used to find where each station's ri
 
 
 def day_counts(ym):
-    y, m = int(ym[:4]), int(ym[4:]); d, wk, we = dt.date(y, m, 1), 0, 0
-    while d.month == m:
-        wk += d.weekday() < 5; we += d.weekday() >= 5; d += dt.timedelta(days=1)
-    return {"WEEKDAY": wk, "WEEKEND": we}
+    from sgdays import day_counts as dc
+    c = dc(ym)
+    return {"WEEKDAY": c["weekday"], "WEEKEND": c["weekend"]}
 
 
 def daytype(s):

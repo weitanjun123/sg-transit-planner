@@ -8,6 +8,8 @@ Saves raw data under data/raw/lta/ and reuses it - each month's passenger volume
 """
 import csv, io, json, os, re, sys, zipfile, datetime as dt
 import requests
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 BASE = "https://datamall2.mytransport.sg/ltaodataservice"
 LINES = ["NSL", "EWL", "CGL", "NEL", "CCL", "CEL", "DTL", "TEL", "BPL", "SLRT", "PLRT"]
@@ -85,14 +87,9 @@ def archive_all_monthly(key):
 
 
 def day_counts(ym):
-    """Weekdays and weekend days in a month (public holidays are not removed)."""
-    y, m = int(ym[:4]), int(ym[4:])
-    d, wk, we = dt.date(y, m, 1), 0, 0
-    while d.month == m:
-        if d.weekday() < 5: wk += 1
-        else: we += 1
-        d += dt.timedelta(days=1)
-    return {"weekday": wk, "weekend": we}
+    """Weekdays and weekend/public-holiday days in a month (matches LTA's DAY_TYPE split)."""
+    from sgdays import day_counts as dc
+    return dc(ym)
 
 
 def build_history(saved):
@@ -113,7 +110,7 @@ def build_history(saved):
 
 
 def build_hourly(raw_path, ym):
-    out = {"month": ym, "source": "LTA DataMall PV/Train", "weekday": {}, "weekend": {}}
+    out = {"month": ym, "source": "LTA DataMall PV/Train", "days": {k: v for k, v in day_counts(ym).items() if k != "holidays_known"}, "weekday": {}, "weekend": {}}
     for row in csv.DictReader(open(raw_path, newline="", encoding="utf-8-sig")):
         day = "weekday" if row["DAY_TYPE"].strip().upper() == "WEEKDAY" else "weekend"
         hour = int(row["TIME_PER_HOUR"])

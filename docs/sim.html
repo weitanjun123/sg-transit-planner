@@ -117,7 +117,7 @@ async function loadDemand() {
   if (pv) {
     for (const day of ['weekday', 'weekend']) for (const [key, rec] of Object.entries(pv[day])) {
       const s = key.split('/').map(c => byCode[c]).find(Boolean); if (!s) continue;
-      const days = day === 'weekday' ? 21 : 9;     // monthly totals -> per-day average
+      const days = pv.days ? pv.days[day] : (day === 'weekday' ? 21 : 9);     // monthly totals -> per-day average (public holidays count as weekend, as in LTA's data)
       for (let h = 0; h < 24; h++) { demand[s.id][day].in[h] += rec.in[h] / days; demand[s.id][day].out[h] += rec.out[h] / days; }
     }
     srcNote = `Demand: LTA DataMall passenger volume ${pv.month} (tap-ins/outs per station per hour).`;
