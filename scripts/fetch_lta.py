@@ -23,28 +23,55 @@ def get(path, key, **params):
 
 
 def passenger_volume(key):
+    """Download every month LTA still offers (it keeps ~3) and keep each one forever in data/raw/lta/."""
     os.makedirs(RAW, exist_ok=True)
-    today = dt.datetime.now(SGT).date().replace(day=1)
-    months = []
-    d = today
+    d = dt.datetime.now(SGT).date().replace(day=1)
     for _ in range(4):
         d = (d - dt.timedelta(days=1)).replace(day=1)
-        months.append(d.strftime("%Y%m"))
-    for ym in months:  # newest first; LTA keeps the last 3 months
+        ym = d.strftime("%Y%m")
         raw_path = f"{RAW}/pv_train_{ym}.csv"
-        if not os.path.exists(raw_path):
-            try:
-                link = get("PV/Train", key, Date=ym)["value"][0]["Link"]
-            except Exception as e:
-                print(f"PV/Train {ym}: not available ({e})"); continue
-            z = zipfile.ZipFile(io.BytesIO(requests.get(link, timeout=120).content))
-            name = [n for n in z.namelist() if n.lower().endswith(".csv")][0]
-            open(raw_path, "wb").write(z.read(name))
-            print(f"PV/Train {ym}: downloaded {name}")
-        else:
-            print(f"PV/Train {ym}: reusing saved file")
-        build_hourly(raw_path, ym)
-        return
+        if os.path.exists(raw_path):
+            print(f"PV/Train {ym}: already archived"); continue
+        try:
+            link = get("PV/Train", key, Date=ym)["value"][0]["Link"]
+        except Exception as e:
+            print(f"PV/Train {ym}: not available ({e})"); continue
+        z = zipfile.ZipFile(io.BytesIO(requests.get(link, timeout=120).content))
+        name = [n for n in z.namelist() if n.lower().endswith(".csv")][0]
+        open(raw_path, "wb").write(z.read(name))
+        print(f"PV/Train {ym}: downloaded {name}")
+    saved = sorted(f for f in os.listdir(RAW) if re.match(r"pv_train_\d{6}\.csv$", f))
+    if saved:
+        build_hourly(f"{RAW}/{saved[-1]}", saved[-1][9:15])
+        build_history(saved)
+
+
+def day_counts(ym):
+    """Weekdays and weekend days in a month (public holidays are not removed)."""
+    y, m = int(ym[:4]), int(ym[4:])
+    d, wk, we = dt.date(y, m, 1), 0, 0
+    while d.month == m:
+        if d.weekday() < 5: wk += 1
+        else: we += 1
+        d += dt.timedelta(days=1)
+    return {"weekday": wk, "weekend": we}
+
+
+def build_history(saved):
+    """docs/data/pv_history.json: every archived month, monthly totals per station per hour (in, out)."""
+    hist = {"source": "LTA DataMall PV/Train, archived monthly by the data bot", "months": [], "days": {}, "data": {}}
+    for f in saved:
+        ym = f[9:15]; key_m = f"{ym[:4]}-{ym[4:]}"
+        month = {"weekday": {}, "weekend": {}}
+        for row in csv.DictReader(open(f"{RAW}/{f}", newline="", encoding="utf-8-sig")):
+            day = "weekday" if row["DAY_TYPE"].strip().upper() == "WEEKDAY" else "weekend"
+            key = "/".join(c for c in re.split(r"[-/ ]+", row["PT_CODE"].strip()) if c)
+            rec = month[day].setdefault(key, [[0] * 24, [0] * 24])
+            h = int(row["TIME_PER_HOUR"])
+            rec[0][h] += int(row["TOTAL_TAP_IN_VOLUME"]); rec[1][h] += int(row["TOTAL_TAP_OUT_VOLUME"])
+        hist["months"].append(key_m); hist["days"][key_m] = day_counts(ym); hist["data"][key_m] = month
+    json.dump(hist, open(f"{OUT}/pv_history.json", "w"), separators=(",", ":"))
+    print(f"pv_history.json: {len(saved)} months archived ({hist['months'][0]} to {hist['months'][-1]})")
 
 
 def build_hourly(raw_path, ym):

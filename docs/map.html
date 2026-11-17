@@ -32,7 +32,7 @@
 <body>
 <div id="panel">
   <h1>SG Transit Planner</h1>
-  <div class="mute">Open-source MRT gap finder · <a href="./">home</a> · <a href="sim.html">pixel MRT sim</a></div>
+  <div class="mute">Open-source MRT gap finder · <a href="./">home</a> · <a href="sim.html">pixel MRT sim</a> · <a href="compare.html">ridership compare</a></div>
   <div id="banner"></div>
   <h2>Network year</h2>
   <div class="yr" id="years"></div>
@@ -58,8 +58,18 @@
 const fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
 const get = p => fetch(p, {cache:'no-store'}).then(r => r.ok ? r.json() : null).catch(() => null);
 const map = L.map('map', {zoomControl:true, preferCanvas:true}).setView([1.355, 103.82], 12);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18 }).addTo(map);
+// Basemaps: OneMap (Singapore Land Authority) - free, no key; CARTO as a fallback
+const OM_ATTR = '<img src="https://www.onemap.gov.sg/web-assets/images/logo/om_logo.png" style="height:16px;width:16px;vertical-align:middle"/> <a href="https://www.onemap.gov.sg/" target="_blank">OneMap</a> &copy; contributors | <a href="https://www.sla.gov.sg/" target="_blank">Singapore Land Authority</a>';
+const om = style => L.tileLayer(`https://www.onemap.gov.sg/maps/tiles/${style}/{z}/{x}/{y}.png`,
+  {detectRetina:true, minZoom:11, maxZoom:19, attribution:OM_ATTR});
+const BASE = {
+  'OneMap Night': om('Night'), 'OneMap Grey': om('Grey'), 'OneMap Default': om('Default'), 'OneMap Original': om('Original'),
+  'Dark (CARTO)': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19})};
+let baseName = 'OneMap Night'; try { baseName = localStorage.getItem('sgtp_base') || baseName; } catch (e) {}
+(BASE[baseName] || BASE['OneMap Night']).addTo(map);
+L.control.layers(BASE, null, {position:'topright'}).addTo(map);
+map.on('baselayerchange', e => { try { localStorage.setItem('sgtp_base', e.name); } catch (err) {} });
+map.setMinZoom(11); map.setMaxBounds([[1.144, 103.535], [1.494, 104.502]]);
 const G = { net:L.layerGroup().addTo(map), gaps:L.layerGroup().addTo(map), prop:L.layerGroup().addTo(map),
             fut:L.layerGroup().addTo(map), crowd:L.layerGroup().addTo(map) };
 const YEARS = [[2026.9,'Today'],[2027,'2027'],[2028.6,'2028'],[2030,'2030'],[2032,'2032'],[2040,'2040']];

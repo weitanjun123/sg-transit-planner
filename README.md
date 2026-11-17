@@ -21,7 +21,10 @@ It also includes a **2D pixel MRT simulation**. You can watch trains fill up thr
 | `scripts/fetch_lta.py` | LTA DataMall: monthly passenger volume per station per hour, plus today's platform crowd forecast and the live crowd level |
 | `scripts/fetch_hdb.py` | data.gov.sg HDB Property Information (all ~13k blocks) joined to HDB building footprints (block no + town) |
 | `scripts/analyse.py` | Gap analysis + greedy station siting + line building → `docs/data/analysis.json` |
-| `docs/` | GitHub Pages site: `map.html` (Leaflet), `sim.html` (canvas pixel sim) |
+| `docs/` | GitHub Pages site: `map.html` (Leaflet + OneMap basemaps), `sim.html` (canvas pixel sim), `compare.html` (month-on-month / year-on-year ridership) |
+| `data/raw/lta/pv_train_YYYYMM.csv` | Every LTA monthly passenger-volume file, archived forever (LTA itself keeps only 3 months) → `docs/data/pv_history.json` |
+| `data/manual/lta_ridership_monthly.csv` | LTA's official average daily bus/MRT/LRT ridership by month, 2019–2025 |
+| `scripts/build_land.py` | Singapore coastline (URA boundary) rasterised for the pixel sim |
 | `.github/workflows/data.yml` | Daily data bot (06:17 SGT) |
 
 ## Method (short)
@@ -53,6 +56,9 @@ cd docs && python -m http.server   # open http://localhost:8000
 - URA Master Plan 2019 Rail Station layer (data.gov.sg, Singapore Open Data Licence)
 - HDB Property Information (data.gov.sg, Singapore Open Data Licence)
 - HDB Existing Buildings footprints (data.gov.sg) to locate each block
+- OneMap (Singapore Land Authority) basemap tiles, free and keyless
+- LTA monthly public transport ridership 2019–2025 (lta.gov.sg statistics)
+- URA Master Plan 2014 country boundary via [yinshanyang/singapore](https://github.com/yinshanyang/singapore) (pixel-sim coastline)
 - LTA station points via [cheeaun/sgraildata](https://github.com/cheeaun/sgraildata)
 - LTA, URA and HDB press releases for planned stations, BTO launches and land sales (linked per row)
 

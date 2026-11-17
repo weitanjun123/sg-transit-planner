@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner — Ridership compare</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --a:#f2c14e; --b:#5aa9ff; --up:#3fbf7f; --down:#e5484d; --line:#2b3038; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:980px; margin:0 auto; padding:16px 14px 60px; }
+  h1 { font-size:20px; margin:0 0 2px; } h2 { font-size:15px; margin:26px 0 8px; } a { color:var(--gold); }
+  .mute { color:var(--mute); font-size:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; }
+  .ctrl { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+  .seg { display:inline-flex; border:1px solid #3a404c; border-radius:8px; overflow:hidden; }
+  .seg button { background:#252932; color:var(--ink); border:0; padding:6px 10px; font:inherit; cursor:pointer; }
+  .seg button.on { background:var(--gold); color:#111; font-weight:600; }
+  select, input { background:#252932; color:var(--ink); border:1px solid #3a404c; border-radius:8px; padding:6px 8px; font:inherit; }
+  .label { font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:3px; }
+  .kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .kpi { background:#252932; border-radius:8px; padding:8px 10px; } .kpi b { display:block; font-size:20px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; } .chip { background:#2c313b; border-radius:14px; padding:3px 10px; cursor:pointer; font-size:13px; }
+  .chip.on { outline:2px solid var(--gold); } .chip i { font-style:normal; color:var(--mute); margin-left:6px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } th, td { padding:6px 4px; border-bottom:1px solid var(--line); text-align:right; }
+  th:first-child, td:first-child { text-align:left; } th { color:var(--mute); font-weight:500; cursor:pointer; } tr:hover td { background:#22262e; }
+  .up { color:var(--up); } .down { color:var(--down); }
+  .note { background:#3a2f12; color:#f6dfa0; padding:8px 10px; border-radius:8px; font-size:12px; margin:8px 0; }
+  svg text { fill:var(--mute); font-size:22px; }
+  @media (max-width:600px) { .kpi b { font-size:16px; } }
+</style>
+</head>
+<body><main>
+  <h1>Ridership compare</h1>
+  <div class="mute"><a href="./">home</a> · <a href="map.html">gap map</a> · <a href="sim.html">pixel sim</a> · your choices are remembered on this device · <a href="#" id="share">copy link to this view</a></div>
+
+  <h2>Stations (LTA tap-in / tap-out data)</h2>
+  <div class="card">
+    <div class="ctrl">
+      <div><span class="label">Show</span><div class="seg" id="scope"><button data-v="mine">My stations</button><button data-v="station">One station</button><button data-v="line">A line</button><button data-v="all">Whole network</button></div></div>
+      <div id="pickStation"><span class="label">Station</span><input id="stationIn" list="stationList" placeholder="Type a station…" size="18"><datalist id="stationList"></datalist></div>
+      <div id="pickLine"><span class="label">Line</span><select id="lineSel"></select></div>
+    </div>
+    <div style="margin-top:10px"><span class="label">My stations (tap to view, ✕ to remove, ★ in the table to add)</span><div class="chips" id="mine"></div></div>
+  </div>
+  <div class="card ctrl">
+    <div><span class="label">Count</span><div class="seg" id="metric"><button data-v="in">Taps in</button><button data-v="out">Taps out</button><button data-v="both">In + out</button></div></div>
+    <div><span class="label">Days</span><div class="seg" id="day"><button data-v="weekday">Weekdays</button><button data-v="weekend">Weekends</button></div></div>
+    <div><span class="label">Time</span><div class="seg" id="win"><button data-v="all">All day</button><button data-v="am">7–9am</button><button data-v="pm">6–8pm</button></div></div>
+    <div><span class="label">Units</span><div class="seg" id="unit"><button data-v="day">Per day</button><button data-v="month">Month total</button></div></div>
+  </div>
+  <div class="card ctrl">
+    <div><span class="label">Compare</span><div class="seg" id="mode"><button data-v="mom">Month on month</button><button data-v="yoy">Year on year</button><button data-v="custom">Pick 2 months</button></div></div>
+    <div><span class="label" style="color:var(--a)">Month A</span><select id="mA"></select></div>
+    <div><span class="label" style="color:var(--b)">vs Month B</span><select id="mB"></select></div>
+  </div>
+  <div id="msg"></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><div class="mute" id="chartTitle"></div><div id="chart"></div></div>
+  <div class="card"><div class="mute" id="tableTitle" style="margin-bottom:6px"></div><table id="tbl"></table></div>
+
+  <h2>Whole system since 2019 (LTA official monthly ridership)</h2>
+  <div class="card ctrl">
+    <div><span class="label">Mode</span><div class="seg" id="nmode"><button data-v="2">MRT</button><button data-v="3">LRT</button><button data-v="1">Bus</button></div></div>
+    <div><span class="label">Compare</span><div class="seg" id="ncmp"><button data-v="yoy">Year on year</button><button data-v="mom">Month on month</button></div></div>
+    <div><span class="label">Month</span><select id="nMonth"></select></div>
+  </div>
+  <div class="kpis" id="nkpis"></div>
+  <div class="card"><div id="nchart"></div><div class="mute" id="nsrc"></div></div>
+  <p class="mute">Station figures are LTA DataMall monthly tap-in/tap-out totals. Interchanges report one combined figure, which is counted in every line it serves. "Per day" divides by the number of weekdays or weekend days in the month; public holidays are not taken out. LTA only keeps the last 3 months, so the data bot archives each month as it appears and the history grows from Aug 2026.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const fmt = n => n == null || isNaN(n) ? '–' : Math.round(n).toLocaleString('en-SG');
+const pct = (a, b) => b ? (a - b) / b * 100 : null;
+const pctTxt = p => p == null ? '–' : `<span class="${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '+' : ''}${p.toFixed(1)}%</span>`;
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const mLabel = m => `${MON[+m.slice(5) - 1]} ${m.slice(0, 4)}`;
+const shift = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5) - 1 + k, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const DEF = {scope:'mine', station:'', line:'EW', metric:'in', day:'weekday', win:'am', unit:'day', mode:'mom', a:'', b:'', mine:['EW24/NS1', 'EW14/NS26'], nmode:'2', ncmp:'yoy', nMonth:''};
+let st = {...DEF}, H, ST, NAME = {}, LINES = {}, R;
+
+function load() {
+  try { Object.assign(st, JSON.parse(localStorage.getItem('sgtp_compare') || '{}')); } catch (e) {}
+  if (location.hash.length > 1) try { Object.assign(st, JSON.parse(decodeURIComponent(location.hash.slice(1)))); } catch (e) {}
+}
+function save() { try { localStorage.setItem('sgtp_compare', JSON.stringify(st)); } catch (e) {} history.replaceState(null, '', '#' + encodeURIComponent(JSON.stringify(st))); }
+
+function seg(id, key, cb) {
+  const el = $(id);
+  const paint = () => [...el.children].forEach(b => b.classList.toggle('on', b.dataset.v === String(st[key])));
+  el.onclick = e => { const v = e.target.dataset?.v; if (!v) return; st[key] = v; paint(); (cb || render)(); };
+  paint();
+}
+
+// ---------------------------------------------------------------- station data
+function keysInScope() {
+  const keys = Object.keys(H.data[H.months[H.months.length - 1]].weekday);
+  if (st.scope === 'station') return keys.filter(k => k === st.station);
+  if (st.scope === 'mine') return keys.filter(k => st.mine.includes(k));
+  if (st.scope === 'line') return keys.filter(k => k.split('/').some(c => c.replace(/\d.*$/, '') === st.line));
+  return keys;
+}
+function value(month, key, hours) {          // per-day or month total for one station key
+  const rec = H.data[month]?.[st.day]?.[key]; if (!rec) return null;
+  const pick = st.metric === 'in' ? [rec[0]] : st.metric === 'out' ? [rec[1]] : [rec[0], rec[1]];
+  let v = 0; for (const arr of pick) for (const h of hours) v += arr[h];
+  return st.unit === 'day' ? v / H.days[month][st.day] : v;
+}
+function hoursOf() { return st.win === 'am' ? [7, 8] : st.win === 'pm' ? [18, 19] : [...Array(24).keys()]; }
+function profile(month, keys) {             // 24 hourly values summed over keys
+  return [...Array(24).keys()].map(h => keys.reduce((a, k) => { const v = value(month, k, [h]); return a + (v || 0); }, 0));
+}
+
+function render() {
+  $('pickStation').style.display = st.scope === 'station' ? '' : 'none';
+  $('pickLine').style.display = st.scope === 'line' ? '' : 'none';
+  // months
+  const ms = H.months, last = ms[ms.length - 1];
+  if (!ms.includes(st.a)) st.a = last;
+  if (st.mode === 'mom') st.b = shift(st.a, -1);
+  if (st.mode === 'yoy') st.b = shift(st.a, -12);
+  if (st.mode === 'custom' && !st.b) st.b = ms[Math.max(0, ms.length - 2)];
+  const opts = (sel, val, list) => { sel.innerHTML = list.map(m => `<option value="${m}" ${m === val ? 'selected' : ''}>${mLabel(m)}${ms.includes(m) ? '' : ' (not archived)'}</option>`).join(''); };
+  opts($('mA'), st.a, ms);
+  const bList = st.mode === 'custom' ? ms : [st.b];
+  opts($('mB'), st.b, bList); $('mB').disabled = st.mode !== 'custom';
+  // chips
+  $('mine').innerHTML = st.mine.map(k => `<span class="chip ${st.scope === 'station' && st.station === k ? 'on' : ''}" data-k="${k}">${NAME[k] || k}<i data-x="${k}">✕</i></span>`).join('') || '<span class="mute">None yet.</span>';
+  const keys = keysInScope(), hrs = hoursOf(), haveB = ms.includes(st.b);
+  const sum = m => keys.reduce((a, k) => a + (value(m, k, hrs) || 0), 0);
+  const A = sum(st.a), B = haveB ? sum(st.b) : null;
+  const scopeName = st.scope === 'station' ? (NAME[st.station] || 'pick a station') : st.scope === 'mine' ? 'My stations' : st.scope === 'line' ? (LINES[st.line] || st.line) : 'Whole network';
+  const what = `${{in:'taps in', out:'taps out', both:'taps in + out'}[st.metric]}, ${st.day === 'weekday' ? 'weekdays' : 'weekends'}, ${{all:'all day', am:'7–9am', pm:'6–8pm'}[st.win]}, ${st.unit === 'day' ? 'per day' : 'month total'}`;
+  $('msg').innerHTML = haveB ? '' : `<div class="note">${mLabel(st.b)} is older than the station archive, which starts ${mLabel(ms[0])} (LTA only keeps 3 months), so it can't be compared.` +
+    (st.mode === 'yoy' ? ` The first station-level year-on-year comparison will be ${mLabel(shift(ms[0], 12))}. Network-wide year-on-year since 2019 is below.` : '') + '</div>';
+  $('kpis').innerHTML = `<div class="kpi"><span class="mute" style="color:var(--a)">${mLabel(st.a)}</span><b>${fmt(A)}</b></div>
+    <div class="kpi"><span class="mute" style="color:var(--b)">${mLabel(st.b)}</span><b>${haveB ? fmt(B) : '–'}</b></div>
+    <div class="kpi"><span class="mute">Change</span><b>${haveB ? pctTxt(pct(A, B)) : '–'}</b></div>`;
+  // chart
+  $('chartTitle').textContent = `${scopeName} · hourly profile · ${what}`;
+  lineChart($('chart'), [...Array(24).keys()].map(h => `${h}`), [
+    {name:mLabel(st.a), color:'var(--a)', v:profile(st.a, keys)}, ...(haveB ? [{name:mLabel(st.b), color:'var(--b)', v:profile(st.b, keys)}] : [])], hrs);
+  // table
+  R = keys.map(k => { const a = value(st.a, k, hrs), b = haveB ? value(st.b, k, hrs) : null; return {k, name:NAME[k] || k, a, b, d:a != null && b != null ? a - b : null, p:pct(a, b)}; });
+  sortTable();
+  save();
+}
+let sortKey = 'a', sortDir = -1;
+function sortTable() {
+  R.sort((x, y) => ((x[sortKey] ?? -1e18) > (y[sortKey] ?? -1e18) ? 1 : -1) * sortDir * (sortKey === 'name' ? -1 : 1));
+  const haveB = H.months.includes(st.b);
+  $('tableTitle').textContent = `${R.length} station(s) · tap a heading to sort · tap a name to focus it`;
+  $('tbl').innerHTML = `<tr><th data-s="name">Station</th><th data-s="a" style="color:var(--a)">${mLabel(st.a)}</th>${haveB ? `<th data-s="b" style="color:var(--b)">${mLabel(st.b)}</th><th data-s="d">Change</th><th data-s="p">%</th>` : ''}<th></th></tr>` +
+    R.slice(0, 200).map(r => `<tr><td><a href="#" data-go="${r.k}">${r.name}</a> <span class="mute">${r.k}</span></td><td>${fmt(r.a)}</td>${haveB ? `<td>${fmt(r.b)}</td><td>${r.d == null ? '–' : (r.d >= 0 ? '+' : '') + fmt(r.d)}</td><td>${pctTxt(r.p)}</td>` : ''}<td><a href="#" data-star="${r.k}">${st.mine.includes(r.k) ? '★' : '☆'}</a></td></tr>`).join('');
+}
+
+// ---------------------------------------------------------------- tiny SVG line chart
+function lineChart(el, labels, series, hi = [], opts = {}) {
+  const W = 900, Hh = opts.h || 360, L = 70, Rr = 10, T = 18, B = 34;
+  const all = series.flatMap(s => s.v).filter(v => v != null), max = Math.max(1, ...all) * 1.08, n = labels.length;
+  const x = i => L + (W - L - Rr) * (n === 1 ? .5 : i / (n - 1)), y = v => T + (Hh - T - B) * (1 - v / max);
+  let g = '';
+  for (const i of hi) g += `<rect x="${x(i) - (W - L - Rr) / (n - 1) / 2}" y="${T}" width="${(W - L - Rr) / (n - 1)}" height="${Hh - T - B}" fill="#ffffff08"/>`;
+  for (let k = 0; k <= 4; k++) { const v = max / 1.08 * k / 4; g += `<line x1="${L}" x2="${W - Rr}" y1="${y(v)}" y2="${y(v)}" stroke="#2b3038"/><text x="${L - 6}" y="${y(v) + 3}" text-anchor="end">${v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'k' : Math.round(v)}</text>`; }
+  const step = Math.ceil(n / 12);
+  labels.forEach((l, i) => { if (i % step === 0 || i === n - 1) g += `<text x="${x(i)}" y="${Hh - 4}" text-anchor="middle">${l}</text>`; });
+  for (const s of series) {
+    const pts = s.v.map((v, i) => v == null ? null : `${x(i)},${y(v)}`).filter(Boolean).join(' ');
+    g += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${s.w || 4}" stroke-linejoin="round"/>`;
+    (s.dots || []).forEach(i => { if (s.v[i] != null) g += `<circle cx="${x(i)}" cy="${y(s.v[i])}" r="8" fill="${s.dotColor || s.color}" stroke="#14161a" stroke-width="2"/>`; });
+  }
+  const leg = series.filter(s => s.name).map(s => `<span style="color:${s.color}">━ ${s.name}</span>`).join(' &nbsp; ');
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${Hh}" width="100%" preserveAspectRatio="xMidYMid meet">${g}</svg><div class="mute">${leg}</div>`;
+}
+
+// ---------------------------------------------------------------- network (LTA official)
+let N;
+function renderNet() {
+  const rows = N.rows, col = +st.nmode, months = rows.map(r => r[0]);
+  if (!months.includes(st.nMonth)) st.nMonth = months[months.length - 1];
+  $('nMonth').innerHTML = months.slice().reverse().map(m => `<option value="${m}" ${m === st.nMonth ? 'selected' : ''}>${mLabel(m)}</option>`).join('');
+  const i = months.indexOf(st.nMonth), j = st.ncmp === 'yoy' ? months.indexOf(shift(st.nMonth, -12)) : i - 1;
+  const a = rows[i][col] * 1000, b = j >= 0 ? rows[j][col] * 1000 : null, name = {1:'Bus', 2:'MRT', 3:'LRT'}[col];
+  $('nkpis').innerHTML = `<div class="kpi"><span class="mute" style="color:var(--a)">${mLabel(st.nMonth)} · ${name}/day</span><b>${fmt(a)}</b></div>
+    <div class="kpi"><span class="mute" style="color:var(--b)">${j >= 0 ? mLabel(months[j]) : 'n/a'}</span><b>${fmt(b)}</b></div>
+    <div class="kpi"><span class="mute">Change</span><b>${pctTxt(pct(a, b))}</b></div>`;
+  lineChart($('nchart'), months.map(m => m.slice(2, 4) === '19' && m.slice(5) === '01' || m.slice(5) === '01' ? m.slice(0, 4) : ''),
+    [{name:`${name}, average daily ridership`, color:'var(--a)', v:rows.map(r => r[col] * 1000), dots:[i, ...(j >= 0 ? [j] : [])], dotColor:'#5aa9ff'}], [], {h:320});
+  $('nsrc').innerHTML = `Source: <a href="${N.url}" target="_blank">LTA public transport ridership, monthly</a> (latest published: ${mLabel(months[months.length - 1])}).`;
+  save();
+}
+
+// ---------------------------------------------------------------- boot
+(async () => {
+  load();
+  [H, ST, N] = await Promise.all(['data/pv_history.json', 'data/stations.json', 'data/lta_ridership_monthly.json'].map(p => fetch(p, {cache:'no-store'}).then(r => r.ok ? r.json() : null)));
+  const code2name = {}; for (const s of ST.stations) for (const c of s.codes) code2name[c.code] = s.name;
+  for (const k of Object.keys(H.data[H.months[H.months.length - 1]].weekday)) NAME[k] = code2name[k.split('/')[0]] || k;
+  for (const [k, v] of Object.entries(ST.lines)) if (['NS','EW','CG','NE','CC','DT','TE','BP','SE','SW','PE','PW'].includes(k)) LINES[k] = v.name;
+  $('lineSel').innerHTML = Object.entries(LINES).map(([k, v]) => `<option value="${k}" ${k === st.line ? 'selected' : ''}>${v}</option>`).join('');
+  $('lineSel').onchange = e => { st.line = e.target.value; render(); };
+  $('stationList').innerHTML = Object.entries(NAME).sort((a, b) => a[1] < b[1] ? -1 : 1).map(([k, n]) => `<option value="${n} (${k})">`).join('');
+  $('stationIn').value = st.station ? `${NAME[st.station]} (${st.station})` : '';
+  $('stationIn').onchange = e => { const m = e.target.value.match(/\(([^)]+)\)\s*$/); if (m && NAME[m[1]]) { st.station = m[1]; render(); } };
+  seg('scope', 'scope', () => { if (st.scope === 'station' && !st.station) st.station = st.mine[0] || 'EW24/NS1'; $('stationIn').value = `${NAME[st.station] || ''} (${st.station})`; render(); });
+  ['metric', 'day', 'win', 'unit', 'mode'].forEach(k => seg(k, k));
+  seg('nmode', 'nmode', renderNet); seg('ncmp', 'ncmp', renderNet);
+  $('nMonth').onchange = e => { st.nMonth = e.target.value; renderNet(); };
+  $('mA').onchange = e => { st.a = e.target.value; render(); };
+  $('mB').onchange = e => { st.b = e.target.value; render(); };
+  $('mine').onclick = e => {
+    if (e.target.dataset.x) { st.mine = st.mine.filter(k => k !== e.target.dataset.x); render(); return; }
+    const k = e.target.closest('.chip')?.dataset.k; if (k) { st.scope = 'station'; st.station = k; seg('scope', 'scope'); $('stationIn').value = `${NAME[k]} (${k})`; render(); }
+  };
+  $('tbl').onclick = e => {
+    const t = e.target; if (t.dataset.s) { sortDir = sortKey === t.dataset.s ? -sortDir : -1; sortKey = t.dataset.s; sortTable(); return; }
+    if (t.dataset.star) { e.preventDefault(); const k = t.dataset.star; st.mine = st.mine.includes(k) ? st.mine.filter(x => x !== k) : [...st.mine, k]; render(); return; }
+    if (t.dataset.go) { e.preventDefault(); st.scope = 'station'; st.station = t.dataset.go; seg('scope', 'scope'); $('stationIn').value = `${NAME[st.station]} (${st.station})`; render(); }
+  };
+  $('share').onclick = e => { e.preventDefault(); save(); navigator.clipboard?.writeText(location.href); e.target.textContent = 'link copied ✓'; };
+  render(); renderNet();
+})();
+</script>
+</body>
+</html>

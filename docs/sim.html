@@ -32,7 +32,7 @@
 </head>
 <body>
 <header>
-  <h1>▣ SG MRT PIXEL SIM</h1>
+  <h1>▣ SG MRT PIXEL SIM</h1><a href="compare.html" style="color:#ffd23f;font-size:12px">ridership compare</a>
   <span id="clock">08:00</span>
   <button id="play">❚❚</button>
   <select id="speed"><option value="0.5">½×</option><option value="1" selected>1×</option><option value="4">4×</option><option value="15">15×</option></select>
@@ -78,7 +78,7 @@ function headway(h, weekend) {      // minutes between trains
   if (h < 7) return 3.5; if (h < 9) return 0; if (h < 17) return 4.5; if (h < 20) return 0; if (h < 23) return 5.5; return 7;
 }
 // ------------------------------------------------------------------ state
-let FC = null, S, byCode = {}, routes = {}, demand = {}, trains = [], t = 480, playing = true, speed = 1, weekend = false, zoom = 1, you = null, srcNote = '';
+let LAND = null, FC = null, S, byCode = {}, routes = {}, demand = {}, trains = [], t = 480, playing = true, speed = 1, weekend = false, zoom = 1, you = null, srcNote = '';
 const cv = document.getElementById('map'), ctx = cv.getContext('2d'); cv.width = W; cv.height = H;
 const land = document.createElement('canvas'); land.width = W; land.height = H;
 
@@ -94,6 +94,7 @@ async function init() {
     let acc = 0; routes[k].tt = [0];
     for (let i = 1; i < stops.length; i++) { acc += dist(stops[i-1].s, stops[i].s) / SPEED_KMH * 60 + DWELL; routes[k].tt.push(acc); }
   }
+  try { const r = await fetch('data/sg_land.json'); if (r.ok) LAND = await r.json(); } catch (e) {}
   try { const r = await fetch('data/crowd_forecast.json', {cache:'no-store'}); if (r.ok) FC = await r.json(); } catch (e) {}
   const real = await loadDemand();
   buildLoads();
@@ -204,11 +205,23 @@ function drawLand() {
   // water sparkle
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   l.fillStyle = '#121735'; for (let i = 0; i < 500; i++) l.fillRect(Math.floor(rnd() * W), Math.floor(rnd() * H), 2, 1);
-  // island blob from every station (pixel circles)
-  l.fillStyle = '#1b2a26';
-  for (const s of S.stations) { const x = px(s.lon), y = py(s.lat); for (let dx = -13; dx <= 13; dx++) for (let dy = -13; dy <= 13; dy++) if (dx*dx + dy*dy < 160) l.fillRect(x + dx, y + dy, 1, 1); }
-  l.fillStyle = '#22352f';
-  for (const s of S.stations) { const x = px(s.lon), y = py(s.lat); for (let dx = -6; dx <= 6; dx++) for (let dy = -6; dy <= 6; dy++) if (dx*dx + dy*dy < 30) l.fillRect(x + dx, y + dy, 1, 1); }
+  if (LAND) {
+    // real coastline (URA boundary) rasterised to this pixel grid; 1-px sand edge + checker dither
+    const grid = new Uint8Array(W * H);
+    LAND.rows.forEach((runs, y) => { for (let i = 0; i < runs.length; i += 2) for (let x = runs[i]; x < runs[i] + runs[i + 1]; x++) grid[y * W + x] = 1; });
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!grid[y * W + x]) continue;
+      const edge = !grid[y * W + x - 1] || !grid[y * W + x + 1] || !grid[(y - 1) * W + x] || !grid[(y + 1) * W + x];
+      l.fillStyle = edge ? '#3d5a4c' : ((x + y) % 2 ? '#1d2e29' : '#1b2b26'); l.fillRect(x, y, 1, 1);
+    }
+    // built-up glow around stations
+    l.fillStyle = '#243a33';
+    for (const s of S.stations) { if (s.open_year) continue; const x = px(s.lon), y = py(s.lat);
+      for (let dx = -5; dx <= 5; dx++) for (let dy = -5; dy <= 5; dy++) if (dx*dx + dy*dy < 22 && grid[(y + dy) * W + x + dx] && (x + dx + y + dy) % 2) l.fillRect(x + dx, y + dy, 1, 1); }
+  } else {
+    l.fillStyle = '#1b2a26';
+    for (const s of S.stations) { const x = px(s.lon), y = py(s.lat); for (let dx = -13; dx <= 13; dx++) for (let dy = -13; dy <= 13; dy++) if (dx*dx + dy*dy < 160) l.fillRect(x + dx, y + dy, 1, 1); }
+  }
   // tracks (Bresenham)
   for (const r of Object.values(routes)) {
     l.fillStyle = r.color;
