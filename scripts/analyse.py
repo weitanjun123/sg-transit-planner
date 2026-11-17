@@ -13,7 +13,8 @@ Method (all parameters in PARAMS, printed into the output so anyone can reproduc
  1. residents = dwelling units x average household size, on a 300 m grid
  2. a cell is "served" if an MRT station is within ~800 m straight line of its centre (about a 10-minute walk
     to the nearest station entrance; entrances sit up to ~200 m from the station centre point)
- 3. unserved residents are weighted up when their current nearest station is crowded in the AM peak
+ 3. unserved residents are weighted up when their current nearest station is crowded in the AM peak, and again
+    when many people there take a morning bus just to reach an MRT station (LTA bus origin-destination data)
  4. greedy siting: repeatedly place a new station where it would serve the most weighted unserved residents,
     at least 1 km from any existing/planned station, until a station would serve too few people
  5. new stations are chained into lines (max 3 km apart, no sharp turns) and both ends are tied into the
@@ -26,6 +27,7 @@ PARAMS = {
     "grid_m": 300, "persons_per_unit": 3.1, "walk_radius_m": 800, "lrt_counts_as": 0.5,
     "min_site_spacing_m": 1000, "min_new_residents": 6000, "max_link_m": 3000, "max_turn_deg": 70,
     "max_tie_in_m": 3500, "infill_max_offset_m": 700, "crowd_weight": 1.0,
+    "bus_feeder_radius_m": 600, "bus_feeder_weight": 1.0,
 }
 D = "docs/data"
 LAT0, LON0 = 1.3521, 103.8198
@@ -132,6 +134,10 @@ def main():
         c["future"] += int(f["units"]) * P["persons_per_unit"]; c["names"].add(f["name"])
 
     crowd, has_pv, has_fc = crowd_index(mrt_now, now_year)
+    # morning bus trips that start here and end at an MRT station (people bussing to the train): from scripts/insights.py
+    ins = load("insights.json", {}) or {}
+    feeders = [(xy(a["lat"], a["lon"]), a["feeder_trips_per_day"]) for a in ins.get("bus", {}).get("areas", [])]
+    G_f = Grid([p for p, _ in feeders]) if feeders else None
 
     # ---- 2+3. coverage + weighting ---------------------------------------------------------
     keys = list(cells)
@@ -156,7 +162,8 @@ def main():
         un_after_plans += pop
         lrt = P["lrt_counts_as"] if G_lrt.near(x, y, R) else 1.0
         jn, dn = nearest(x, y, P_now)
-        w = pop * lrt * (1 + P["crowd_weight"] * crowd.get(mrt_now[jn]["id"], 0))
+        fb = sum(feeders[i][1] for i in G_f.near(x, y, P["bus_feeder_radius_m"])) if G_f else 0
+        w = pop * lrt * (1 + P["crowd_weight"] * crowd.get(mrt_now[jn]["id"], 0)) * (1 + P["bus_feeder_weight"] * min(1.0, fb / 2000))
         weight[k] = (w, pop, mrt_now[jn]["id"])
         lat, lon = ll(x, y)
         gaps.append([lat, lon, round(pop), round(w), round(dn)])
@@ -315,7 +322,7 @@ def main():
     out = {
         "generated": dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).isoformat(timespec="minutes"),
         "params": P,
-        "inputs": {"hdb_blocks": len(blocks), "future_projects": len(future), "lta_passenger_volume": has_pv, "lta_crowd_forecast": has_fc},
+        "inputs": {"hdb_blocks": len(blocks), "future_projects": len(future), "lta_passenger_volume": has_pv, "lta_crowd_forecast": has_fc, "bus_feeder_areas": len(feeders)},
         "summary": {"residents_now": round(tot_now), "future_residents": round(tot_future),
                     "unserved_now": round(un_now), "unserved_after_lta_plans": round(un_after_plans),
                     "served_by_planned_lines": round(sum(fixed_by_plan.values()))},

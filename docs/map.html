@@ -32,7 +32,7 @@
 <body>
 <div id="panel">
   <h1>SG Transit Planner</h1>
-  <div class="mute">Open-source MRT gap finder · <a href="./">home</a> · <a href="sim.html">pixel MRT sim</a> · <a href="compare.html">ridership compare</a> · <a href="report.html">early wakers</a></div>
+  <div class="mute">Open-source MRT gap finder · <a href="./">home</a> · <a href="sim.html">pixel MRT sim</a> · <a href="compare.html">ridership compare</a> · <a href="report.html">early wakers</a> · <a href="insights.html">deep dive</a> · <a href="heartbeat.html">heartbeat</a></div>
   <div id="banner"></div>
   <h2>Network year</h2>
   <div class="yr" id="years"></div>
@@ -42,6 +42,7 @@
   <label class="tg"><input type="checkbox" id="lyProp" checked> Proposed new lines &amp; stations</label>
   <label class="tg"><input type="checkbox" id="lyFuture" checked> New BTO &amp; land-sale sites</label>
   <label class="tg"><input type="checkbox" id="lyCrowd" checked> Today's AM-peak crowd (LTA)</label>
+  <label class="tg"><input type="checkbox" id="lyBus" checked> People bussing to the MRT each morning</label>
   <h2>Summary</h2>
   <div class="stats" id="stats"></div>
   <h2>Proposed lines</h2>
@@ -71,9 +72,15 @@ L.control.layers(BASE, null, {position:'topright'}).addTo(map);
 map.on('baselayerchange', e => { try { localStorage.setItem('sgtp_base', e.name); } catch (err) {} });
 map.setMinZoom(11); map.setMaxBounds([[1.144, 103.535], [1.494, 104.502]]);
 const G = { net:L.layerGroup().addTo(map), gaps:L.layerGroup().addTo(map), prop:L.layerGroup().addTo(map),
-            fut:L.layerGroup().addTo(map), crowd:L.layerGroup().addTo(map) };
+            fut:L.layerGroup().addTo(map), crowd:L.layerGroup().addTo(map), bus:L.layerGroup().addTo(map) };
 const YEARS = [[2026.9,'Today'],[2027,'2027'],[2028.6,'2028'],[2030,'2030'],[2032,'2032'],[2040,'2040']];
-let ST, AN, FC, year = 2026.9;
+let ST, AN, FC, INS, year = 2026.9;
+function drawBus() {
+  G.bus.clearLayers();
+  if (!INS || !INS.bus || !INS.bus.available || !document.getElementById('lyBus').checked) return;
+  for (const a of INS.bus.areas) L.circleMarker([a.lat, a.lon], {radius: 3 + Math.sqrt(a.feeder_trips_per_day) / 6, color:'#3fbf7f', weight:1, fillColor:'#3fbf7f', fillOpacity:.35})
+    .bindPopup(`<b>${a.town || 'Area'}</b><br>${fmt(a.feeder_trips_per_day)} morning bus trips a day to an MRT station<br>${a.feeder_share_pct ?? '–'}% of bus trips starting here · ${a.km_to_mrt} km to the nearest MRT`).addTo(G.bus);
+}
 
 function drawNetwork() {
   G.net.clearLayers();
@@ -152,15 +159,16 @@ function panel() {
   document.getElementById('fixed').innerHTML = AN.fixed_by_lta_plans.slice(0, 10).map(f => `${f.station}: ${fmt(f.residents)} residents`).join('<br>') || '–';
   const P = AN.params;
   document.getElementById('method').innerHTML =
-    `Residents = HDB dwelling units × ${P.persons_per_unit}. A home counts as served if an MRT station (open or announced by LTA) is within ~${P.walk_radius_m} m straight line (≈10-min walk). Unserved residents count double when their current nearest station is crowded in the 7–9am peak (LTA data). New stations are placed greedily where they serve the most people, ≥${P.min_site_spacing_m/1000} km from any station, and only if they serve ≥${fmt(P.min_new_residents)} residents. These are starting points for planners, not engineering alignments.<br><br>Updated ${AN.generated}. <a href="https://github.com/weitanjun123/sg-transit-planner">Code &amp; data</a>`;
+    `Residents = HDB dwelling units × ${P.persons_per_unit}. A home counts as served if an MRT station (open or announced by LTA) is within ~${P.walk_radius_m} m straight line (≈10-min walk). Unserved residents count up to double when their current nearest station is crowded in the 7–9am peak, and up to double again where many people take a morning bus just to reach an MRT station (LTA data). New stations are placed greedily where they serve the most people, ≥${P.min_site_spacing_m/1000} km from any station, and only if they serve ≥${fmt(P.min_new_residents)} residents. These are starting points for planners, not engineering alignments.<br><br>Updated ${AN.generated}. <a href="https://github.com/weitanjun123/sg-transit-planner">Code &amp; data</a>`;
 }
 
 (async () => {
-  [ST, AN, FC] = await Promise.all([get('data/stations.json'), get('data/analysis.json'), get('data/crowd_forecast.json')]);
+  [ST, AN, FC, INS] = await Promise.all([get('data/stations.json'), get('data/analysis.json'), get('data/crowd_forecast.json'), get('data/insights.json')]);
   const yb = document.getElementById('years');
   YEARS.forEach(([y, lab]) => { const b = document.createElement('button'); b.textContent = lab; if (y === year) b.className = 'on';
     b.onclick = () => { year = y; [...yb.children].forEach(c => c.className = ''); b.className = 'on'; drawNetwork(); }; yb.appendChild(b); });
-  drawNetwork(); drawCrowd(); if (AN) { drawAnalysis(); panel(); }
+  drawNetwork(); drawCrowd(); drawBus(); if (AN) { drawAnalysis(); panel(); }
+  document.getElementById('lyBus').onchange = drawBus;
   ['lyGaps','lyProp','lyFuture'].forEach(id => document.getElementById(id).onchange = drawAnalysis);
   document.getElementById('lyCrowd').onchange = drawCrowd;
 })();

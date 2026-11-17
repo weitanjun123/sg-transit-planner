@@ -86,6 +86,26 @@ def archive_all_monthly(key):
     json.dump(man, open(mpath, "w"), indent=1, sort_keys=True)
 
 
+def bus_stops(key):
+    """All bus stop locations (LTA BusStops, paged 500 at a time), refreshed every 28 days -> data/raw/lta/bus_stops.json
+    as {code: [lon, lat, description, road]}."""
+    import time
+    path = f"{RAW}/bus_stops.json"
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < 28 * 86400:
+        return
+    out, skip = {}, 0
+    while True:
+        rows = get("BusStops", key, **{"$skip": skip}).get("value", [])
+        for r in rows:
+            out[r["BusStopCode"]] = [r["Longitude"], r["Latitude"], r.get("Description", ""), r.get("RoadName", "")]
+        if len(rows) < 500:
+            break
+        skip += 500
+    if len(out) > 4000:
+        json.dump(out, open(path, "w"), separators=(",", ":"))
+    print(f"bus_stops.json: {len(out)} stops")
+
+
 def day_counts(ym):
     """Weekdays and weekend/public-holiday days in a month (matches LTA's DAY_TYPE split)."""
     from sgdays import day_counts as dc
@@ -156,4 +176,8 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     passenger_volume(key)
     archive_all_monthly(key)
+    try:
+        bus_stops(key)
+    except Exception as e:
+        print(f"BusStops: {e}")
     crowd(key)

@@ -24,6 +24,9 @@ It also includes a **2D pixel MRT simulation**. You can watch trains fill up thr
 | `docs/` | GitHub Pages site: `map.html` (Leaflet + OneMap basemaps), `sim.html` (canvas pixel sim), `compare.html` (month-on-month / year-on-year ridership) |
 | `data/raw/lta/pv_train_YYYYMM.csv` | Every LTA monthly passenger-volume file, archived forever (LTA itself keeps only 3 months) → `docs/data/pv_history.json` |
 | `data/manual/lta_ridership_monthly.csv` | LTA's official average daily bus/MRT/LRT ridership by month, 2019–2025 |
+| `scripts/report.py` → `docs/report.html` | Early wakers & night owls, distance vs morning start, point-to-point trips |
+| `scripts/insights.py` → `docs/insights.html`, `docs/heartbeat.html` | Hidden line changes (every trip routed), bus-to-MRT feeder trips, minutes on the train by town, station types, weekends, trips not returning by MRT, 24-hour flow animation; also `segment_loads.json` for the pixel sim |
+| `scripts/sgdays.py` | Singapore public holidays (MOM), so per-day averages match LTA's weekday / weekend-holiday split |
 | `scripts/build_land.py` | Singapore coastline (URA boundary) rasterised for the pixel sim |
 | `.github/workflows/data.yml` | Daily data bot (06:17 SGT) |
 

@@ -78,7 +78,7 @@ function headway(h, weekend) {      // minutes between trains
   if (h < 7) return 3.5; if (h < 9) return 0; if (h < 17) return 4.5; if (h < 20) return 0; if (h < 23) return 5.5; return 7;
 }
 // ------------------------------------------------------------------ state
-let LAND = null, FC = null, S, byCode = {}, routes = {}, demand = {}, trains = [], t = 480, playing = true, speed = 1, weekend = false, zoom = 1, you = null, srcNote = '';
+let SEG = null, LAND = null, FC = null, S, byCode = {}, routes = {}, demand = {}, trains = [], t = 480, playing = true, speed = 1, weekend = false, zoom = 1, you = null, srcNote = '';
 const cv = document.getElementById('map'), ctx = cv.getContext('2d'); cv.width = W; cv.height = H;
 const land = document.createElement('canvas'); land.width = W; land.height = H;
 
@@ -94,6 +94,7 @@ async function init() {
     let acc = 0; routes[k].tt = [0];
     for (let i = 1; i < stops.length; i++) { acc += dist(stops[i-1].s, stops[i].s) / SPEED_KMH * 60 + DWELL; routes[k].tt.push(acc); }
   }
+  try { const r = await fetch('data/segment_loads.json', {cache:'no-store'}); if (r.ok) SEG = await r.json(); } catch (e) {}
   try { const r = await fetch('data/sg_land.json'); if (r.ok) LAND = await r.json(); } catch (e) {}
   try { const r = await fetch('data/crowd_forecast.json', {cache:'no-store'}); if (r.ok) FC = await r.json(); } catch (e) {}
   const real = await loadDemand();
@@ -120,7 +121,7 @@ async function loadDemand() {
       const days = pv.days ? pv.days[day] : (day === 'weekday' ? 21 : 9);     // monthly totals -> per-day average (public holidays count as weekend, as in LTA's data)
       for (let h = 0; h < 24; h++) { demand[s.id][day].in[h] += rec.in[h] / days; demand[s.id][day].out[h] += rec.out[h] / days; }
     }
-    srcNote = `Demand: LTA DataMall passenger volume ${pv.month} (tap-ins/outs per station per hour).`;
+    srcNote = SEG ? `Train loads: every LTA origin-destination trip (${SEG.months.join(', ')}) routed on the network, incl. line changes.` : `Demand: LTA DataMall passenger volume ${pv.month} (tap-ins/outs per station per hour).`;
     document.getElementById('src').textContent = srcNote; return true;
   } else {
     // placeholder until LTA data arrives: homes far from the CBD board in the morning, CBD stations empty out
@@ -167,6 +168,11 @@ function buildLoads() {
 }
 function trainsPerHour(r, h) { const hw = headway(h, weekend) || r.peak; return 60 / hw; }
 function segLoad(r, dir, k, h) {     // fraction of capacity on segment k for a train in direction dir (+1 up the codes, -1 down)
+  if (SEG) {                          // routed LTA origin-destination trips (includes people changing lines)
+    const a = r.stops[k].code, b = r.stops[k + 1].code, key = dir > 0 ? `${a}>${b}` : `${b}>${a}`;
+    const arr = SEG[weekend ? 'weekend' : 'weekday'][key];
+    if (arr) return arr[h % 24] / trainsPerHour(r, h % 24) / r.cap;
+  }
   const L = r.load[weekend ? 'weekend' : 'weekday'][h % 24]; if (!L) return 0;
   return (dir > 0 ? L.up[k] : L.down[k]) / trainsPerHour(r, h % 24) / r.cap;
 }
@@ -289,7 +295,7 @@ function renderTrip() {
       (ld == null ? '<span>exit</span>' : `<div class="bar"><i style="width:${Math.min(100, ld * 100 / 1.4)}%;background:${loadCol(ld)}"></i></div>`) + '</div>';
   }).join('') + `<div class="mute" style="margin-top:6px">${Math.round(you.arrive - you.board)} min on board · fullest stretch ≈ ${Math.round(maxL * 100)}% of capacity` +
     (maxL > .9 ? ' — packed, you may have to let a train go' : maxL > .6 ? ' — crowded, standing shoulder to shoulder' : maxL > .15 ? ' — seats taken, comfortable standing room' : ' — good chance of a seat') +
-    ' (100% = 1,920 people incl. standing; only ~15% are seats).' + platformNote() + '</div>';
+    ' (100% = 1,920 people incl. standing; only ~15% are seats).' + (SEG ? '' : ' Loads leaving Jurong East are understated without the routed data.') + platformNote() + '</div>';
 }
 
 function platformNote() {

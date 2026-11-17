@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Singapore's 24-hour MRT heartbeat</title>
+<style>
+  html, body { margin:0; background:#0b0d12; color:#e9ecf1; font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; overflow:hidden; height:100%; }
+  #stage { position:fixed; inset:0; }
+  #cv { position:absolute; inset:0; width:100%; height:100%; }
+  #hud { position:absolute; left:14px; top:12px; right:14px; pointer-events:none; }
+  #clock { font:700 54px/1 "Bebas Neue", Oswald, Impact, system-ui; color:#f2c14e; letter-spacing:.02em; }
+  #moving { font-size:15px; color:#cfd5de; } #moving b { color:#fff; }
+  #top { margin-top:6px; font-size:13px; color:#9aa3ae; max-width:520px; }
+  #title { position:absolute; right:14px; top:12px; text-align:right; font:600 13px system-ui; color:#9aa3ae; }
+  #title b { display:block; font:700 22px/1.1 "Bebas Neue", Oswald, Impact, system-ui; color:#fff; letter-spacing:.03em; }
+  #ctrl { position:absolute; left:0; right:0; bottom:0; padding:10px 14px 14px; background:linear-gradient(transparent, #0b0d12 40%); }
+  #bars { width:100%; height:46px; display:block; cursor:pointer; }
+  .btns { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; align-items:center; }
+  button { font:inherit; background:#1d2026; color:#e9ecf1; border:1px solid #3a404c; border-radius:8px; padding:5px 10px; cursor:pointer; }
+  button.on { background:#f2c14e; color:#111; border-color:#f2c14e; }
+  @media (max-width: 600px) { #title { top:auto; bottom:150px; left:14px; text-align:left; } #clock { font-size:46px; } }
+  a { color:#f2c14e; } .mute { color:#9aa3ae; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas>
+  <div id="hud"><div id="clock">05:00</div><div id="moving"></div><div id="top"></div></div>
+  <div id="title"><b>SINGAPORE'S MRT HEARTBEAT</b>every station-to-station trip, one weekday<br><a href="insights.html" style="pointer-events:auto">deep dive</a> · <a href="./" style="pointer-events:auto">home</a></div>
+  <div id="ctrl">
+    <canvas id="bars"></canvas>
+    <div class="btns"><button id="play">❚❚</button><button data-s="0.5">slow</button><button data-s="1" class="on">normal</button><button data-s="2.5">fast</button>
+      <button id="trails" class="on">trails</button><span class="mute" id="src"></span></div>
+  </div>
+</div>
+<script>
+const cv = document.getElementById('cv'), g = cv.getContext('2d'), bc = document.getElementById('bars'), bg = bc.getContext('2d');
+const HOURS = [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0];
+let HB, LAND, ST, W, H, DPR, proj, t = 0, playing = true, speed = 1, trails = true, parts = [], landImg;
+const SEC_PER_HOUR = 3.2;
+
+function fit() {
+  DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR; g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  bc.width = bc.clientWidth * DPR; bc.height = 46 * DPR;
+  // fit Singapore (lon 103.6-104.02, lat 1.24-1.475) into the space between HUD and controls
+  const top = W < 600 ? 150 : 90, bottom = 110, aw = W - 20, ah = H - top - bottom;
+  const sx = aw / (104.02 - 103.6), sy = ah / (1.475 - 1.24) / 1.0, s = Math.min(sx, sy);
+  const ox = (W - s * (104.02 - 103.6)) / 2, oy = top + (ah - s * (1.475 - 1.24)) / 2;
+  proj = (lat, lon) => [ox + (lon - 103.6) * s, oy + (1.475 - lat) * s];
+  // pre-render land
+  landImg = document.createElement('canvas'); landImg.width = W * DPR; landImg.height = H * DPR;
+  const l = landImg.getContext('2d'); l.setTransform(DPR, 0, 0, DPR, 0, 0);
+  l.fillStyle = '#0b0d12'; l.fillRect(0, 0, W, H);
+  if (LAND) {
+    const cw = s * (104.02 - 103.6) / LAND.w, ch = s * (1.475 - 1.24) / LAND.h;
+    l.fillStyle = '#161c22';
+    LAND.rows.forEach((runs, y) => { for (let i = 0; i < runs.length; i += 2) l.fillRect(ox + runs[i] * cw, oy + y * ch, runs[i + 1] * cw + .6, ch + .6); });
+  }
+  l.fillStyle = '#3a4250';
+  for (const [, lat, lon] of Object.values(HB.stations)) { const [x, y] = proj(lat, lon); l.fillRect(x - 1, y - 1, 2, 2); }
+  g.drawImage(landImg, 0, 0, W, H);
+}
+function hourOf(t) { return HOURS[Math.floor(t) % HOURS.length]; }
+function colorFor(h) { return h >= 5 && h < 10 ? [242, 193, 78] : h < 16 ? [240, 240, 240] : h < 20 ? [90, 169, 255] : [178, 120, 255]; }
+
+let spawnAcc = 0;
+function spawn(dt) {
+  const hr = HB.hours[hourOf(t)]; if (!hr) return;
+  const flows = hr.flows, total = flows.reduce((a, f) => a + f[2], 0);
+  const perSec = total / 45 / SEC_PER_HOUR;          // one dot ≈ 45 trips
+  spawnAcc += perSec * dt;
+  while (spawnAcc >= 1) {
+    spawnAcc -= 1;
+    let r = Math.random() * total, f = flows[0];
+    for (const x of flows) { r -= x[2]; if (r <= 0) { f = x; break; } }
+    const a = HB.stations[f[0]], b = HB.stations[f[1]]; if (!a || !b) continue;
+    const [x0, y0] = proj(a[1], a[2]), [x1, y1] = proj(b[1], b[2]);
+    const len = Math.hypot(x1 - x0, y1 - y0), bend = (Math.random() - .5) * .25;
+    parts.push({x0, y0, x1, y1, cx:(x0 + x1) / 2 - (y1 - y0) * bend, cy:(y0 + y1) / 2 + (x1 - x0) * bend, p:0, v:0.7 / (0.6 + len / 260), c:colorFor(hourOf(t))});
+  }
+}
+function draw(dt) {
+  if (trails) { g.globalAlpha = 0.16; g.drawImage(landImg, 0, 0, W, H); g.globalAlpha = 1; } else g.drawImage(landImg, 0, 0, W, H);
+  g.globalCompositeOperation = 'lighter';
+  for (const q of parts) {
+    q.p += q.v * dt * speed; const u = q.p, iu = 1 - u;
+    const x = iu * iu * q.x0 + 2 * iu * u * q.cx + u * u * q.x1, y = iu * iu * q.y0 + 2 * iu * u * q.cy + u * u * q.y1;
+    const [r, gg, b] = q.c; g.fillStyle = `rgba(${r},${gg},${b},${0.55 * Math.sin(Math.PI * Math.min(1, u))})`;
+    g.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
+  }
+  g.globalCompositeOperation = 'source-over';
+  parts = parts.filter(q => q.p < 1);
+}
+function hud() {
+  const hf = t % HOURS.length, h = hourOf(t), mins = Math.floor((hf % 1) * 60), hr = HB.hours[h];
+  document.getElementById('clock').textContent = `${String(h).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  document.getElementById('moving').innerHTML = `<b>${Math.round(hr.total).toLocaleString('en-SG')}</b> train trips start this hour`;
+  const top = hr.flows.slice(0, 3).map(f => `${HB.stations[f[0]][0]} → ${HB.stations[f[1]][0]} (${f[2].toLocaleString('en-SG')})`);
+  document.getElementById('top').textContent = 'Top flows: ' + top.join(' · ');
+  // hour bars
+  const bw = bc.width / HOURS.length, max = Math.max(...HOURS.map(x => HB.hours[x].total));
+  bg.clearRect(0, 0, bc.width, bc.height);
+  HOURS.forEach((x, i) => { const v = HB.hours[x].total / max, [r, gg, b] = colorFor(x);
+    bg.fillStyle = i === Math.floor(hf) ? `rgb(${r},${gg},${b})` : `rgba(${r},${gg},${b},.35)`;
+    bg.fillRect(i * bw + 1, bc.height - v * (bc.height - 14 * DPR), bw - 2, v * (bc.height - 14 * DPR));
+    if (x % 3 === 0) { bg.fillStyle = '#9aa3ae'; bg.font = `${10 * DPR}px system-ui`; bg.fillText(`${x}h`, i * bw + 2, 10 * DPR); } });
+  bg.fillStyle = '#fff'; bg.fillRect(hf * bw, 0, 2 * DPR, bc.height);
+}
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt * speed / SEC_PER_HOUR; if (t >= HOURS.length) { t = 0; parts = []; } spawn(dt * speed); }
+  draw(playing ? dt : 0); hud();
+  requestAnimationFrame(loop);
+}
+(async () => {
+  const [hb, land] = await Promise.all([fetch('data/heartbeat.json').then(r => r.json()), fetch('data/sg_land.json').then(r => r.ok ? r.json() : null)]);
+  HB = hb; LAND = land; fit(); addEventListener('resize', fit);
+  document.getElementById('src').textContent = 'LTA DataMall origin–destination train data, weekday average. One dot ≈ 45 trips.';
+  document.getElementById('play').onclick = e => { playing = !playing; e.target.textContent = playing ? '❚❚' : '▶'; };
+  document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { speed = +b.dataset.s; document.querySelectorAll('[data-s]').forEach(x => x.classList.toggle('on', x === b)); });
+  document.getElementById('trails').onclick = e => { trails = !trails; e.target.classList.toggle('on', trails); };
+  bc.onclick = e => { const r = bc.getBoundingClientRect(); t = (e.clientX - r.left) / r.width * HOURS.length; parts = []; };
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
