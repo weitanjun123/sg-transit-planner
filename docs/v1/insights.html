@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner — Deep dive</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --blue:#5aa9ff; --red:#e5484d; --green:#3fbf7f; --line:#2b3038; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:920px; margin:0 auto; padding:18px 14px 70px; }
+  h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:18px; margin:34px 0 4px; } h3 { font-size:14px; margin:10px 0 6px; }
+  a { color:var(--gold); } .mute { color:var(--mute); font-size:13px; } .lead { color:#cfd5de; margin:4px 0 10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px; }
+  .row { display:grid; grid-template-columns:1fr 1fr 74px; gap:8px; align-items:center; padding:5px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .bar { height:9px; background:#252932; border-radius:5px; overflow:hidden; } .bar i { display:block; height:100%; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { padding:6px 4px; border-bottom:1px solid var(--line); text-align:right; vertical-align:top; }
+  td:first-child, th:first-child { text-align:left; } th { color:var(--mute); font-weight:500; }
+  .chips span { display:inline-block; background:#2c313b; border-radius:12px; padding:2px 8px; margin:2px 3px 0 0; font-size:12px; }
+  .big { font-size:26px; font-weight:700; color:var(--gold); }
+  nav.toc { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0; } nav.toc a { background:#252932; border-radius:14px; padding:4px 10px; font-size:13px; text-decoration:none; }
+</style>
+</head>
+<body><div style="position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#f2c14e;color:#111;font:600 12px system-ui;text-align:center;padding:4px">Frozen v1 snapshot (17 Nov 2026) · <a href="../" style="color:#111">open the live version</a></div><main>
+  <h1>Deep dive: how Singapore really rides</h1>
+  <div class="mute"><a href="./">home</a> · <a href="map.html">gap map</a> · <a href="report.html">early wakers</a> · <a href="compare.html">compare</a> · <a href="sim.html">pixel sim</a> · <a href="heartbeat.html">24-hour heartbeat</a></div>
+  <p class="mute" id="meta"></p>
+  <nav class="toc"><a href="#t1">1 Hidden transfers</a><a href="#t2">2 Bus to MRT</a><a href="#t3">3 Commute minutes</a><a href="#t4">4 Station types</a><a href="#t5">5 Weekends</a><a href="#t6">6 Morning vs evening</a><a href="heartbeat.html">7 Heartbeat ▶</a></nav>
+
+  <h2 id="t1">1 · The hidden load: people changing lines</h2>
+  <p class="lead">Tap data only counts people entering and leaving a station. Changing lines inside an interchange is invisible, so every LTA trip is routed along the fastest path to estimate it.</p>
+  <div class="card"><table id="xfer"></table></div>
+  <div class="card"><h3>Busiest stretches of track, 7–9am (both directions counted separately)</h3><div id="segs"></div></div>
+
+  <h2 id="t2">2 · Who takes a bus just to reach the MRT?</h2>
+  <p class="lead">Morning bus trips (6–9am weekdays) that start more than 500 m from any MRT station and end within 300 m of one: people bussing to the train. Big clusters are strong cases for a new station; they also raise the weight of nearby gaps on the <a href="map.html">gap map</a>.</p>
+  <div class="grid"><div class="card"><div class="mute">Feeder trips each weekday morning</div><div class="big" id="feedTotal"></div></div><div class="card"><h3>Stations receiving the most feeder buses</h3><div id="fed"></div></div></div>
+  <div class="card"><h3>Biggest feeder clusters (400 m areas)</h3><table id="feedAreas"></table></div>
+
+  <h2 id="t3">3 · Minutes on the train each morning</h2>
+  <p class="lead">Estimated time on the train for morning trips (6–9am), by HDB town and by station, including about 5 minutes for each change of line. Walking and waiting for the first train are not included.</p>
+  <div class="grid"><div class="card"><h3>Towns, longest to shortest</h3><div id="towns"></div></div><div class="card"><h3>Longest morning rides by station</h3><div id="cmSt"></div></div></div>
+
+  <h2 id="t4">4 · Station personalities</h2>
+  <p class="lead">Each station is sorted by the shape of its weekday: when people tap in, when they tap out, and how busy weekends are. Gold = tap-ins, blue = tap-outs over 24 hours.</p>
+  <div class="grid" id="pers"></div>
+
+  <h2 id="t5">5 · Weekend vs weekday</h2>
+  <div class="grid"><div class="card"><h3>Busier on weekends</h3><div id="wkUp"></div></div><div class="card"><h3>Ghost towns on weekends</h3><div id="wkDown"></div></div></div>
+
+  <h2 id="t6">6 · Morning out, but not back by MRT</h2>
+  <p class="lead">For every morning trip (6–10am) from A to B, is there a matching B → A trip later that day? A low share means people get home another way (bus, car, private-hire, walking) or come back somewhere else.</p>
+  <div class="grid"><div class="card"><h3>Stations whose riders come back by MRT least</h3><div id="mmSt"></div></div><div class="card"><h3>Morning trips with the fewest MRT trips back</h3><table id="mmPairs"></table></div></div>
+
+  <div class="card" style="margin-top:28px"><b>7 · 24-hour heartbeat →</b> <a href="heartbeat.html">watch every station-to-station flow pulse through a weekday</a></div>
+  <p class="mute" id="method"></p>
+</main>
+<script>
+const $ = id => document.getElementById(id), fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
+function bars(el, rows, val, label, color, sub) {
+  const max = Math.max(...rows.map(val));
+  el.innerHTML = rows.map(r => `<div class="row"><span>${r.name || r.town}${sub ? `<br><span class="mute">${sub(r)}</span>` : ''}</span><div class="bar"><i style="width:${(val(r) / max * 100).toFixed(1)}%;background:${color}"></i></div><span class="num">${label(r)}</span></div>`).join('');
+}
+function spark(pin, pout) {
+  const W = 260, H = 60, m = Math.max(...pin, ...pout), pts = a => a.map((v, h) => `${(h / 23 * W).toFixed(1)},${(H - v / m * (H - 4)).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="60"><polyline fill="none" stroke="#f2c14e" stroke-width="2" points="${pts(pin)}"/><polyline fill="none" stroke="#5aa9ff" stroke-width="2" points="${pts(pout)}"/></svg><div class="mute" style="display:flex;justify-content:space-between"><span>0h</span><span>6</span><span>12</span><span>18</span><span>23h</span></div>`;
+}
+(async () => {
+  const D = await (await fetch('data/insights.json', {cache:'no-store'})).json();
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  $('meta').textContent = `LTA DataMall weekday averages for ${D.months.map(m => MON[+m.slice(4) - 1] + ' ' + m.slice(0, 4)).join(', ')} (public holidays counted as weekend days). Updated ${D.generated.slice(0, 10)}; rebuilt each time a new month is archived.`;
+  // 1
+  $('xfer').innerHTML = `<tr><th>Interchange</th><th>Line changes / day</th><th>7–9am</th><th>Tap-ins / day</th><th>Hidden ×</th></tr>` + D.transfers.slice(0, 15).map(r =>
+    `<tr><td>${r.name}<br><span class="mute">${r.top_moves.slice(0, 2).map(m => `${m.from.replace(' Line', '')} → ${m.to.replace(' Line', '')} ${fmt(m.per_day)}`).join(' · ')}</span></td><td>${fmt(r.transfers_per_day)}</td><td>${fmt(r.am_peak_per_day)}</td><td>${fmt(r.tap_ins_per_day)}</td><td><b>${r.hidden_ratio ?? '–'}×</b></td></tr>`).join('') +
+    `</table><div class="mute" style="margin-top:6px">"Hidden ×" = people changing lines there for every person tapping in. A high number means the station is much busier inside than its gates show.</div>`;
+  bars($('segs'), D.busiest_segments_am.slice(0, 10).map(r => ({...r, name:`${r.from} → ${r.to}`})), r => r.am_peak_per_day, r => fmt(r.am_peak_per_day), 'var(--red)', r => r.line);
+  // 2
+  const B = D.bus;
+  if (B.available) {
+    $('feedTotal').textContent = fmt(B.total_feeder_trips_am);
+    bars($('fed'), B.stations_fed.slice(0, 8), r => r.feeder_arrivals_per_day, r => fmt(r.feeder_arrivals_per_day), 'var(--green)');
+    $('feedAreas').innerHTML = `<tr><th>Area</th><th>Feeder trips / day</th><th>Share of its bus trips</th><th>km to nearest MRT</th></tr>` + B.areas.slice(0, 15).map(a =>
+      `<tr><td>${a.town || 'non-HDB area'} <span class="mute">${a.lat.toFixed(4)}, ${a.lon.toFixed(4)}</span></td><td>${fmt(a.feeder_trips_per_day)}</td><td>${a.feeder_share_pct ?? '–'}%</td><td>${a.km_to_mrt}</td></tr>`).join('');
+  } else { $('feedTotal').textContent = '–'; $('feedAreas').innerHTML = '<tr><td class="mute">Bus data not loaded yet.</td></tr>'; }
+  // 3
+  bars($('towns'), D.commute_towns, r => r.avg_minutes, r => r.avg_minutes + ' min', 'var(--gold)', r => `${fmt(r.am_trips_per_day)} morning trips`);
+  bars($('cmSt'), D.commute_stations.slice(0, 12), r => r.avg_minutes, r => r.avg_minutes + ' min', 'var(--gold)', r => r.town);
+  // 4
+  $('pers').innerHTML = D.personalities.map(p => `<div class="card"><h3>${p.type} <span class="mute">(${p.count})</span></h3>${spark(p.profile_in, p.profile_out)}
+    <div class="mute">${Math.round(p.metrics.am_in * 100)}% of tap-ins 7–10am · ${Math.round(p.metrics.am_out * 100)}% of tap-outs 7–10am · weekends at ${Math.round(p.metrics.weekend_ratio * 100)}% of weekdays</div>
+    <div class="chips">${p.stations.slice(0, 14).map(s => `<span>${s}</span>`).join('')}${p.count > 14 ? `<span>+${p.count - 14} more</span>` : ''}</div></div>`).join('');
+  // 5
+  bars($('wkUp'), D.weekend.magnets.slice(0, 10), r => r.ratio, r => r.ratio + '×', 'var(--green)', r => `${fmt(r.weekend_per_day)} vs ${fmt(r.weekday_per_day)} a day`);
+  bars($('wkDown'), D.weekend.commuter_only.slice(0, 10), r => 1 / r.ratio, r => Math.round(r.ratio * 100) + '%', 'var(--red)', r => `${fmt(r.weekend_per_day)} vs ${fmt(r.weekday_per_day)} a day`);
+  // 6
+  bars($('mmSt'), D.mismatch.stations.slice(0, 10), r => 100 - r.come_back_by_mrt_pct, r => r.come_back_by_mrt_pct + '%', 'var(--blue)', r => `${fmt(r.am_out_per_day)} morning trips out`);
+  $('mmPairs').innerHTML = `<tr><th>Morning trip</th><th>a day</th><th>back by MRT</th></tr>` + D.mismatch.pairs.slice(0, 10).map(r => `<tr><td>${r.from} → ${r.to}</td><td>${fmt(r.am_per_day)}</td><td>${r.back_pct}%</td></tr>`).join('');
+  const A = D.assumptions;
+  $('method').innerHTML = `Trips are routed on today's open network (MRT at ~${A.speed_kmh.MRT} km/h, LRT ~${A.speed_kmh.LRT} km/h straight-line between stations, ${A.dwell_min} min per stop, ${A.transfer_min} min per line change), so line-change counts are model estimates, not counts. LTA records where people tap out, which may be a bus interchange rather than their final stop. Bus stops: LTA BusStops. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/insights.py">scripts/insights.py</a>.`;
+})();
+</script>
+</body>
+</html>

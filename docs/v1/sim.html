@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>SG MRT Pixel Sim</title>
+<style>
+  :root { --bg:#0d1020; --panel:#171a2e; --ink:#eef0ff; --mute:#9aa0c3; --gold:#ffd23f; --line:#2a2f52; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.4 "Courier New",ui-monospace,monospace; }
+  header { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 10px; background:var(--panel); border-bottom:2px solid var(--line); position:sticky; top:0; z-index:5; }
+  header h1 { font-size:15px; margin:0 8px 0 0; letter-spacing:.05em; }
+  #clock { font-size:22px; font-weight:700; color:var(--gold); min-width:74px; }
+  button, select { font:inherit; background:#232848; color:var(--ink); border:2px solid #3a4175; padding:4px 8px; cursor:pointer; image-rendering:pixelated; }
+  button.on { background:var(--gold); color:#111; border-color:var(--gold); }
+  #wrap { overflow:auto; border-bottom:2px solid var(--line); background:#0a0d1c; -webkit-overflow-scrolling:touch; }
+  canvas#map { display:block; image-rendering:pixelated; image-rendering:crisp-edges; cursor:pointer; }
+  input[type=range] { width:100%; accent-color:var(--gold); }
+  .row { padding:6px 10px; } .mute { color:var(--mute); font-size:11px; }
+  #cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:10px; padding:10px; }
+  .card { background:var(--panel); border:2px solid var(--line); padding:10px; }
+  .card h2 { font-size:14px; margin:0 0 6px; color:var(--gold); }
+  .stop { display:grid; grid-template-columns:46px 1fr 70px; gap:6px; align-items:center; padding:2px 0; }
+  .bar { height:8px; background:#232848; position:relative; } .bar i { position:absolute; inset:0 auto 0 0; }
+  .stop.now { color:var(--gold); } .stop.done { opacity:.55; }
+  #modal { position:fixed; inset:0; background:rgba(5,6,15,.8); display:none; align-items:center; justify-content:center; z-index:20; }
+  #modal .box { background:var(--panel); border:3px solid var(--gold); padding:12px; width:min(560px,94vw); }
+  #carriage { width:100%; image-rendering:pixelated; cursor:pointer; background:#0a0d1c; }
+  #pinfo { min-height:54px; margin-top:8px; }
+  .legend span { display:inline-block; width:10px; height:10px; margin:0 4px 0 10px; vertical-align:middle; }
+</style>
+</head>
+<body><div style="position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#f2c14e;color:#111;font:600 12px system-ui;text-align:center;padding:4px">Frozen v1 snapshot (17 Nov 2026) · <a href="../" style="color:#111">open the live version</a></div>
+<header>
+  <h1>▣ SG MRT PIXEL SIM</h1><a href="compare.html" style="color:#ffd23f;font-size:12px">ridership compare</a>
+  <span id="clock">08:00</span>
+  <button id="play">❚❚</button>
+  <select id="speed"><option value="0.5">½×</option><option value="1" selected>1×</option><option value="4">4×</option><option value="15">15×</option></select>
+  <button data-t="480">AM rush</button><button data-t="780">Lunch</button><button data-t="1110">PM rush</button><button data-t="1350">Night</button>
+  <button id="day">Weekday</button>
+  <button id="zin">＋</button><button id="zout">－</button>
+</header>
+<div id="wrap"><canvas id="map"></canvas></div>
+<div class="row"><input type="range" id="tslider" min="330" max="1440" step="1" value="480">
+  <div class="mute legend">Train fill: <span style="background:#3ddc84"></span>&lt;50% <span style="background:#ffd23f"></span>50–80% <span style="background:#ff9f1c"></span>80–100% <span style="background:#ff3b3b"></span>&gt;100% crush · tap a train to look inside · <span id="src"></span></div></div>
+<div id="cards">
+  <div class="card">
+    <h2>★ My commute: Jurong East → Raffles Place</h2>
+    <div>Leave Jurong East at <select id="dep"></select> <button id="go">▶ Ride</button></div>
+    <div class="mute" style="margin:6px 0">East-West Line, 10 stops. Your gold passenger boards the first eastbound train.</div>
+    <div id="trip"></div>
+  </div>
+  <div class="card">
+    <h2>Busiest trains right now</h2>
+    <div id="busy"></div>
+  </div>
+</div>
+<div id="modal"><div class="box">
+  <div style="display:flex;justify-content:space-between;align-items:center"><b id="mtitle"></b><button id="mclose">✕</button></div>
+  <div class="mute" id="msub"></div>
+  <canvas id="carriage" width="300" height="96"></canvas>
+  <div id="pinfo" class="mute">Tap a passenger to see their trip.</div>
+</div></div>
+<script>
+// ------------------------------------------------------------------ constants
+const W = 420, H = 232, LON0 = 103.6, LON1 = 104.02, LAT0 = 1.475, LAT1 = 1.24;
+const ROUTES = { // MRT lines in the simulation (current network). cap = passengers per train (LTA rolling stock, approx.)
+  NS:{cap:1920, cars:6, peak:2.2}, EW:{cap:1920, cars:6, peak:2.2}, CG:{cap:1920, cars:6, peak:5},
+  NE:{cap:1920, cars:6, peak:2.5}, CC:{cap:930, cars:3, peak:2.5}, DT:{cap:930, cars:3, peak:2.5}, TE:{cap:1280, cars:4, peak:3}};
+const TRANSFER = 1.5;          // tap-ins undercount riders who change lines; rough uplift (transfer-heavy stretches, e.g. from Jurong East, are still understated)
+const SPEED_KMH = 45, DWELL = 0.4;
+const px = lon => Math.round((lon - LON0) / (LON1 - LON0) * W), py = lat => Math.round((lat - LAT0) / (LAT1 - LAT0) * H);
+const hhmm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0'); };
+const loadCol = f => f < .5 ? '#3ddc84' : f < .8 ? '#ffd23f' : f < 1 ? '#ff9f1c' : '#ff3b3b';
+const dist = (a, b) => Math.hypot((a.lon-b.lon)*111.32*Math.cos(1.35*Math.PI/180), (a.lat-b.lat)*110.57);
+function headway(h, weekend) {      // minutes between trains
+  if (h < 6) return 7; if (weekend) return h < 9 ? 6 : h < 22 ? 4.5 : 6;
+  if (h < 7) return 3.5; if (h < 9) return 0; if (h < 17) return 4.5; if (h < 20) return 0; if (h < 23) return 5.5; return 7;
+}
+// ------------------------------------------------------------------ state
+let SEG = null, LAND = null, FC = null, S, byCode = {}, routes = {}, demand = {}, trains = [], t = 480, playing = true, speed = 1, weekend = false, zoom = 1, you = null, srcNote = '';
+const cv = document.getElementById('map'), ctx = cv.getContext('2d'); cv.width = W; cv.height = H;
+const land = document.createElement('canvas'); land.width = W; land.height = H;
+
+async function init() {
+  S = await (await fetch('data/stations.json')).json();
+  for (const s of S.stations) for (const c of s.codes) if (c.open_year === 0) byCode[c.code] = s;
+  // build each route = open stations sorted by code number (Circle Line closes its loop back to Promenade)
+  for (const k of Object.keys(ROUTES)) {
+    const stops = Object.entries(byCode).filter(([c]) => c.match(/^[A-Z]+/)[0] === k && /\d/.test(c))
+      .sort((a, b) => parseInt(a[0].slice(2)) - parseInt(b[0].slice(2))).map(([c, s]) => ({code:c, s}));
+    if (k === 'CC' && byCode.CC34 && byCode.CC4) stops.push({code:'CC4', s:byCode.CC4});
+    routes[k] = {...ROUTES[k], key:k, stops, color:S.lines[k].color};
+    let acc = 0; routes[k].tt = [0];
+    for (let i = 1; i < stops.length; i++) { acc += dist(stops[i-1].s, stops[i].s) / SPEED_KMH * 60 + DWELL; routes[k].tt.push(acc); }
+  }
+  try { const r = await fetch('data/segment_loads.json', {cache:'no-store'}); if (r.ok) SEG = await r.json(); } catch (e) {}
+  try { const r = await fetch('data/sg_land.json'); if (r.ok) LAND = await r.json(); } catch (e) {}
+  try { const r = await fetch('data/crowd_forecast.json', {cache:'no-store'}); if (r.ok) FC = await r.json(); } catch (e) {}
+  const real = await loadDemand();
+  buildLoads();
+  if (!real) {   // placeholder only: scale so the single worst AM-peak segment is ~110% full (typical of SG peak)
+    let mx = 0;
+    for (const r of Object.values(routes)) for (let h = 7; h < 9; h++) { weekend = false;
+      r.stops.forEach((_, k) => { if (k < r.stops.length - 1) mx = Math.max(mx, segLoad(r, 1, k, h), segLoad(r, -1, k, h)); }); }
+    const f = 1.1 / (mx || 1);
+    for (const id in demand) for (const d of ['weekday', 'weekend']) for (const io of ['in', 'out']) demand[id][d][io] = demand[id][d][io].map(v => v * f);
+    buildLoads();
+  }
+  buildTrains(); drawLand(); setupUI(); requestAnimationFrame(loop);
+}
+
+// ------------------------------------------------------------------ demand: LTA tap-ins/outs per station per hour
+async function loadDemand() {
+  let pv = null; try { const r = await fetch('data/station_hourly.json', {cache:'no-store'}); if (r.ok) pv = await r.json(); } catch(e) {}
+  const rp = byCode.EW14;
+  for (const s of S.stations) demand[s.id] = {weekday:{in:Array(24).fill(0), out:Array(24).fill(0)}, weekend:{in:Array(24).fill(0), out:Array(24).fill(0)}};
+  if (pv) {
+    for (const day of ['weekday', 'weekend']) for (const [key, rec] of Object.entries(pv[day])) {
+      const s = key.split('/').map(c => byCode[c]).find(Boolean); if (!s) continue;
+      const days = pv.days ? pv.days[day] : (day === 'weekday' ? 21 : 9);     // monthly totals -> per-day average (public holidays count as weekend, as in LTA's data)
+      for (let h = 0; h < 24; h++) { demand[s.id][day].in[h] += rec.in[h] / days; demand[s.id][day].out[h] += rec.out[h] / days; }
+    }
+    srcNote = SEG ? `Train loads: every LTA origin-destination trip (${SEG.months.join(', ')}) routed on the network, incl. line changes.` : `Demand: LTA DataMall passenger volume ${pv.month} (tap-ins/outs per station per hour).`;
+    document.getElementById('src').textContent = srcNote; return true;
+  } else {
+    // placeholder until LTA data arrives: homes far from the CBD board in the morning, CBD stations empty out
+    const g = (h, mu, sd) => Math.exp(-((h - mu) ** 2) / (2 * sd * sd));
+    for (const s of S.stations) {
+      if (s.mode !== 'MRT' || s.open_year > 0) continue;
+      const d = dist(s, rp), home = Math.min(1, d / 12), work = Math.exp(-d / 3.5);
+      for (let h = 5; h < 24; h++) {
+        const am = g(h + .5, 8.2, 1), pm = g(h + .5, 18.6, 1.3), mid = g(h + .5, 13.5, 4) * .35;
+        demand[s.id].weekday.in[h] = 9000 * (home * am + work * pm + .25 * mid + .05);
+        demand[s.id].weekday.out[h] = 9000 * (work * am + home * pm + .25 * mid + .05);
+        demand[s.id].weekend.in[h] = 4500 * (mid + .1 + .3 * home * g(h + .5, 11, 2) + .3 * work * g(h + .5, 20, 2));
+        demand[s.id].weekend.out[h] = 4500 * (mid + .1 + .3 * work * g(h + .5, 11, 2) + .3 * home * g(h + .5, 20, 2));
+      }
+    }
+    srcNote = 'Demand: placeholder profile until LTA passenger-volume data is loaded by the data bot.';
+  }
+  document.getElementById('src').textContent = srcNote; return false;
+}
+
+// ------------------------------------------------------------------ gravity model -> passengers on each track segment per hour
+// trips i->j on a line ∝ boardings(i) × alightings(j); load on a segment = all trips passing over it
+function buildLoads() {
+  const linesAt = {};
+  for (const r of Object.values(routes)) for (const st of r.stops) linesAt[st.s.id] = (linesAt[st.s.id] || 0) + 1;
+  for (const r of Object.values(routes)) {
+    r.load = {weekday:[], weekend:[]}; r.trips = {weekday:[], weekend:[]};
+    const n = r.stops.length;
+    for (const day of ['weekday', 'weekend']) for (let h = 0; h < 24; h++) {
+      const bin = r.stops.map(st => demand[st.s.id][day].in[h] / linesAt[st.s.id]);
+      const bout = r.stops.map(st => demand[st.s.id][day].out[h] / linesAt[st.s.id]);
+      const up = Array(n).fill(0), down = Array(n).fill(0), T = [];
+      for (let i = 0; i < n; i++) {
+        const tot = bout.reduce((a, v, j) => j === i ? a : a + v, 0) || 1; T.push([]);
+        for (let j = 0; j < n; j++) {
+          const v = j === i ? 0 : bin[i] * bout[j] / tot * TRANSFER; T[i].push(v);
+          if (j > i) for (let k = i; k < j; k++) up[k] += v;      // segment k = between stop k and k+1
+          if (j < i) for (let k = j; k < i; k++) down[k] += v;
+        }
+      }
+      r.load[day][h] = {up, down}; r.trips[day][h] = T;
+    }
+  }
+}
+function trainsPerHour(r, h) { const hw = headway(h, weekend) || r.peak; return 60 / hw; }
+function segLoad(r, dir, k, h) {     // fraction of capacity on segment k for a train in direction dir (+1 up the codes, -1 down)
+  if (SEG) {                          // routed LTA origin-destination trips (includes people changing lines)
+    const a = r.stops[k].code, b = r.stops[k + 1].code, key = dir > 0 ? `${a}>${b}` : `${b}>${a}`;
+    const arr = SEG[weekend ? 'weekend' : 'weekday'][key];
+    if (arr) return arr[h % 24] / trainsPerHour(r, h % 24) / r.cap;
+  }
+  const L = r.load[weekend ? 'weekend' : 'weekday'][h % 24]; if (!L) return 0;
+  return (dir > 0 ? L.up[k] : L.down[k]) / trainsPerHour(r, h % 24) / r.cap;
+}
+
+// ------------------------------------------------------------------ timetable
+function buildTrains() {
+  trains = [];
+  for (const r of Object.values(routes)) for (const dir of [1, -1]) {
+    let dep = 330 - r.tt[r.tt.length - 1];   // first trains already en route at 05:30
+    while (dep < 1440) {
+      const hw = headway(Math.floor(((dep % 1440) + 1440) % 1440 / 60), weekend) || r.peak;
+      trains.push({r, dir, t0:dep, id:trains.length});
+      dep += hw;
+    }
+  }
+}
+function trainPos(tr, tm) {             // -> {i: stop index behind, f: 0..1 to next, k: segment, done}
+  const r = tr.r, n = r.stops.length, el = tm - tr.t0, tot = r.tt[n - 1];
+  if (el < 0 || el > tot) return null;
+  // timeline in travel order
+  const tt = tr.dir > 0 ? r.tt : r.tt.map(v => tot - v).reverse();
+  let a = 0; while (a < n - 2 && tt[a + 1] <= el) a++;
+  const seg = tt[a + 1] - tt[a], f = Math.min(1, Math.max(0, (el - tt[a] - DWELL) / (seg - DWELL)));
+  const i = tr.dir > 0 ? a : n - 1 - a, j = tr.dir > 0 ? a + 1 : n - 2 - a;
+  return {i, j, f, k: Math.min(i, j)};
+}
+function stopTime(tr, idx) {             // minute the train is at stop index idx
+  const r = tr.r, n = r.stops.length, tot = r.tt[n - 1];
+  return tr.t0 + (tr.dir > 0 ? r.tt[idx] : tot - r.tt[idx]);
+}
+
+// ------------------------------------------------------------------ drawing
+function drawLand() {
+  const l = land.getContext('2d');
+  l.fillStyle = '#0a0d1c'; l.fillRect(0, 0, W, H);
+  // water sparkle
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  l.fillStyle = '#121735'; for (let i = 0; i < 500; i++) l.fillRect(Math.floor(rnd() * W), Math.floor(rnd() * H), 2, 1);
+  if (LAND) {
+    // real coastline (URA boundary) rasterised to this pixel grid; 1-px sand edge + checker dither
+    const grid = new Uint8Array(W * H);
+    LAND.rows.forEach((runs, y) => { for (let i = 0; i < runs.length; i += 2) for (let x = runs[i]; x < runs[i] + runs[i + 1]; x++) grid[y * W + x] = 1; });
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!grid[y * W + x]) continue;
+      const edge = !grid[y * W + x - 1] || !grid[y * W + x + 1] || !grid[(y - 1) * W + x] || !grid[(y + 1) * W + x];
+      l.fillStyle = edge ? '#3d5a4c' : ((x + y) % 2 ? '#1d2e29' : '#1b2b26'); l.fillRect(x, y, 1, 1);
+    }
+    // built-up glow around stations
+    l.fillStyle = '#243a33';
+    for (const s of S.stations) { if (s.open_year) continue; const x = px(s.lon), y = py(s.lat);
+      for (let dx = -5; dx <= 5; dx++) for (let dy = -5; dy <= 5; dy++) if (dx*dx + dy*dy < 22 && grid[(y + dy) * W + x + dx] && (x + dx + y + dy) % 2) l.fillRect(x + dx, y + dy, 1, 1); }
+  } else {
+    l.fillStyle = '#1b2a26';
+    for (const s of S.stations) { const x = px(s.lon), y = py(s.lat); for (let dx = -13; dx <= 13; dx++) for (let dy = -13; dy <= 13; dy++) if (dx*dx + dy*dy < 160) l.fillRect(x + dx, y + dy, 1, 1); }
+  }
+  // tracks (Bresenham)
+  for (const r of Object.values(routes)) {
+    l.fillStyle = r.color;
+    for (let i = 1; i < r.stops.length; i++) {
+      let x0 = px(r.stops[i-1].s.lon), y0 = py(r.stops[i-1].s.lat); const x1 = px(r.stops[i].s.lon), y1 = py(r.stops[i].s.lat);
+      const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1, dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1; let e = dx + dy;
+      for (;;) { l.fillRect(x0, y0, 1, 1); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
+    }
+  }
+  l.font = '7px monospace'; l.fillStyle = '#7f88b8';
+  [['WOODLANDS',103.786,1.462],['JURONG',103.70,1.36],['CBD',103.86,1.272],['TAMPINES',103.94,1.364],['PUNGGOL',103.90,1.425],['CHANGI',103.985,1.345]]
+    .forEach(([t, lo, la]) => l.fillText(t, px(lo) - t.length * 2, py(la)));
+}
+function stationCrowd(s, h) {
+  const d = demand[s.id][weekend ? 'weekend' : 'weekday']; return (d.in[h] + d.out[h]);
+}
+function draw() {
+  ctx.drawImage(land, 0, 0);
+  const h = Math.floor(t / 60) % 24;
+  let maxC = 1; for (const s of S.stations) if (s.open_year === 0) maxC = Math.max(maxC, stationCrowd(s, h));
+  for (const s of S.stations) {
+    if (s.open_year !== 0 || s.mode !== 'MRT') continue;
+    const x = px(s.lon), y = py(s.lat), c = stationCrowd(s, h) / maxC, big = s.codes.filter(c => c.open_year === 0).length > 1;
+    ctx.fillStyle = c > .6 ? '#ff3b3b' : c > .3 ? '#ffb347' : '#ffffff';
+    ctx.fillRect(x - (big ? 1 : 0), y - (big ? 1 : 0), big ? 3 : 2, big ? 3 : 2);
+  }
+  const busy = [];
+  for (const tr of trains) {
+    const p = trainPos(tr, t); if (!p) continue;
+    const r = tr.r, a = r.stops[p.i].s, b = r.stops[p.j].s;
+    const xa = px(a.lon), ya = py(a.lat), xb = px(b.lon), yb = py(b.lat);
+    const len = Math.hypot(xb - xa, yb - ya) || 1, nx = -(yb - ya) / len * tr.dir, ny = (xb - xa) / len * tr.dir;
+    const x = Math.round(xa + (xb - xa) * p.f + nx * 1.5), y = Math.round(ya + (yb - ya) * p.f + ny * 1.5);
+    const ld = segLoad(r, tr.dir, p.k, h);
+    tr.x = x; tr.y = y; tr.ld = ld; tr.p = p;
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 2, 5, 4);
+    ctx.fillStyle = loadCol(ld); ctx.fillRect(x - 1, y - 1, 3, 2);
+    busy.push(tr);
+    if (you && you.train === tr && t >= you.board && t <= you.arrive && Math.floor(performance.now() / 300) % 2) {
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 3, y - 4, 7, 1); ctx.fillRect(x, y - 6, 1, 2);
+    }
+  }
+  document.getElementById('clock').textContent = hhmm(t);
+  return busy;
+}
+
+// ------------------------------------------------------------------ my commute
+const JE = 'EW24', RP = 'EW14';
+function planTrip(depMin) {
+  const r = routes.EW, iA = r.stops.findIndex(s => s.code === JE), iB = r.stops.findIndex(s => s.code === RP), dir = iB > iA ? 1 : -1;
+  const tr = trains.filter(x => x.r === r && x.dir === dir).find(x => stopTime(x, iA) >= depMin);
+  if (!tr) return null;
+  const legs = []; for (let i = iA; i !== iB + dir; i += dir) legs.push(i);
+  return {train:tr, legs, dir, board:stopTime(tr, iA), arrive:stopTime(tr, iB)};
+}
+function renderTrip() {
+  const el = document.getElementById('trip'); if (!you) { el.innerHTML = ''; return; }
+  const r = routes.EW; let maxL = 0;
+  el.innerHTML = you.legs.map((i, n) => {
+    const tm = stopTime(you.train, i), next = you.legs[n + 1];
+    const ld = next == null ? null : segLoad(r, you.dir, Math.min(i, next), Math.floor(tm / 60) % 24);
+    if (ld != null) maxL = Math.max(maxL, ld);
+    const cls = t > tm + 0.4 && next != null && t > stopTime(you.train, next) ? 'done' : (t >= tm - .2 && (next == null || t < stopTime(you.train, next))) ? 'now' : '';
+    return `<div class="stop ${cls}"><span>${hhmm(tm)}</span><span>${n === 0 ? '★ ' : ''}${r.stops[i].s.name}</span>` +
+      (ld == null ? '<span>exit</span>' : `<div class="bar"><i style="width:${Math.min(100, ld * 100 / 1.4)}%;background:${loadCol(ld)}"></i></div>`) + '</div>';
+  }).join('') + `<div class="mute" style="margin-top:6px">${Math.round(you.arrive - you.board)} min on board · fullest stretch ≈ ${Math.round(maxL * 100)}% of capacity` +
+    (maxL > .9 ? ' — packed, you may have to let a train go' : maxL > .6 ? ' — crowded, standing shoulder to shoulder' : maxL > .15 ? ' — seats taken, comfortable standing room' : ' — good chance of a seat') +
+    ' (100% = 1,920 people incl. standing; only ~15% are seats).' + (SEG ? '' : ' Loads leaving Jurong East are understated without the routed data.') + platformNote() + '</div>';
+}
+
+function platformNote() {
+  if (!FC || !you) return '';
+  const slot = hhmm(Math.floor(you.board / 30) * 30), lv = (FC.stations[JE] || []).find(x => x[0] === slot);
+  return lv ? `<br>LTA platform crowd forecast, Jurong East ${slot} (${FC.date}): <b>${{l:'low', m:'moderate', h:'high'}[lv[1]] || lv[1]}</b>.` : '';
+}
+// ------------------------------------------------------------------ carriage view
+let modalTrain = null, sprites = [];
+function openTrain(tr) {
+  modalTrain = tr; const r = tr.r, h = Math.floor(t / 60) % 24, p = trainPos(tr, t) || tr.p;
+  const nxt = r.stops[p.j].s.name, term = r.stops[tr.dir > 0 ? r.stops.length - 1 : 0].s.name;
+  document.getElementById('mtitle').textContent = `${S.lines[r.key].name} → ${term}`;
+  document.getElementById('msub').textContent = `Next: ${nxt} · ${Math.round(tr.ld * 100)}% full · ≈${Math.round(tr.ld * r.cap).toLocaleString()} people on board (estimate)`;
+  const c = document.getElementById('carriage'), g = c.getContext('2d');
+  g.fillStyle = '#0a0d1c'; g.fillRect(0, 0, 300, 96);
+  const cw = Math.floor(290 / r.cars), people = Math.round(Math.min(1.5, tr.ld) * r.cap / r.cars / 9);
+  sprites = []; let seed = tr.id * 97 + h; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const isYou = you && you.train === tr && t >= you.board && t <= you.arrive;
+  for (let k = 0; k < r.cars; k++) {
+    const x0 = 5 + k * cw;
+    g.fillStyle = r.color; g.fillRect(x0, 20, cw - 4, 56); g.fillStyle = '#d9dcef'; g.fillRect(x0 + 2, 26, cw - 8, 44);
+    g.fillStyle = '#9aa0c3'; for (let s = 0; s < 4; s++) g.fillRect(x0 + 4 + s * ((cw - 12) / 4), 62, (cw - 12) / 4 - 2, 6);
+    for (let q = 0; q < people; q++) {
+      const sx = x0 + 4 + Math.floor(rnd() * (cw - 14)), sy = 30 + Math.floor(rnd() * 30);
+      const gold = isYou && k === 2 && q === people - 1;
+      g.fillStyle = gold ? '#ffd23f' : ['#2b2d42','#8d5524','#c68642','#e0ac69','#4a4e69'][Math.floor(rnd() * 5)];
+      g.fillRect(sx + 1, sy, 3, 3); g.fillStyle = gold ? '#ffd23f' : ['#e63946','#457b9d','#2a9d8f','#f4a261','#6d597a'][Math.floor(rnd() * 5)]; g.fillRect(sx, sy + 3, 5, 6);
+      sprites.push({x:sx, y:sy, gold, rnd:rnd()});
+    }
+    g.fillStyle = '#222'; g.fillRect(x0 + 4, 76, 6, 4); g.fillRect(x0 + cw - 14, 76, 6, 4);
+  }
+  g.fillStyle = '#5a5f80'; g.fillRect(0, 82, 300, 2);
+  document.getElementById('pinfo').textContent = people ? 'Tap a passenger to see their trip.' : 'This train is almost empty.';
+  document.getElementById('modal').style.display = 'flex';
+}
+function passengerTrip(sp) {
+  const tr = modalTrain, r = tr.r, p = tr.p, h = Math.floor(t / 60) % 24, T = r.trips[weekend ? 'weekend' : 'weekday'][h], n = r.stops.length;
+  if (sp.gold) { const el = document.getElementById('trip'); el.scrollIntoView({behavior:'smooth'}); return `★ That's you! Jurong East ${hhmm(you.board)} → Raffles Place ${hhmm(you.arrive)} (${Math.round(you.arrive - you.board)} min).`; }
+  // pick an origin already passed and a destination still ahead, weighted by the gravity model
+  const behind = [], ahead = [];
+  for (let i = 0; i < n; i++) { if ((tr.dir > 0 && i <= p.i) || (tr.dir < 0 && i >= p.i)) behind.push(i); else ahead.push(i); }
+  if (!ahead.length) ahead.push(p.j);
+  const pairs = []; let tot = 0;
+  for (const i of behind) for (const j of ahead) { const v = T[i][j]; if (v > 0) { pairs.push([i, j, v]); tot += v; } }
+  let x = sp.rnd * tot, pick = pairs[0] || [p.i, p.j, 1]; for (const pr of pairs) { x -= pr[2]; if (x <= 0) { pick = pr; break; } }
+  const [i, j] = pick, ti = stopTime(tr, i), tj = stopTime(tr, j);
+  return `Boarded at ${r.stops[i].s.name} (${hhmm(ti)}) → getting off at ${r.stops[j].s.name} (${hhmm(tj)}), ${Math.round(Math.abs(tj - ti))} min on board.`;
+}
+
+// ------------------------------------------------------------------ UI + loop
+function setZoom(z) {
+  zoom = Math.max(1, Math.min(6, z)); const wrap = document.getElementById('wrap');
+  const base = wrap.clientWidth; cv.style.width = base * zoom + 'px'; cv.style.height = base * zoom * H / W + 'px';
+}
+function follow(x, y) { const wrap = document.getElementById('wrap'), s = cv.clientWidth / W;
+  wrap.scrollLeft = x * s - wrap.clientWidth / 2; wrap.scrollTop = y * s - wrap.clientHeight / 2; }
+function setupUI() {
+  setZoom(1); window.addEventListener('resize', () => setZoom(zoom));
+  document.getElementById('wrap').style.maxHeight = '62vh';
+  const dep = document.getElementById('dep');
+  for (let m = 360; m <= 1380; m += 15) dep.add(new Option(hhmm(m), m, false, m === 480));
+  document.getElementById('play').onclick = e => { playing = !playing; e.target.textContent = playing ? '❚❚' : '▶'; };
+  document.getElementById('speed').onchange = e => speed = +e.target.value;
+  document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { t = +b.dataset.t; });
+  document.getElementById('tslider').oninput = e => { t = +e.target.value; };
+  document.getElementById('day').onclick = e => { weekend = !weekend; e.target.textContent = weekend ? 'Weekend' : 'Weekday'; buildTrains(); you = null; renderTrip(); };
+  document.getElementById('zin').onclick = () => setZoom(zoom + 1); document.getElementById('zout').onclick = () => setZoom(zoom - 1);
+  document.getElementById('go').onclick = () => {
+    you = planTrip(+dep.value); if (!you) return;
+    t = you.board - 3; speed = 1; document.getElementById('speed').value = '1'; playing = true; document.getElementById('play').textContent = '❚❚';
+    setZoom(Math.max(zoom, 3)); renderTrip();
+  };
+  cv.onclick = e => {
+    const b = cv.getBoundingClientRect(), x = (e.clientX - b.left) / b.width * W, y = (e.clientY - b.top) / b.height * H;
+    let best = null; for (const tr of trains) if (tr.x != null && trainPos(tr, t)) { const d = Math.hypot(tr.x - x, tr.y - y); if (d < (best?.d ?? 6)) best = {tr, d}; }
+    if (best) openTrain(best.tr);
+  };
+  document.getElementById('carriage').onclick = e => {
+    const c = e.target, b = c.getBoundingClientRect(), x = (e.clientX - b.left) / b.width * 300, y = (e.clientY - b.top) / b.height * 96;
+    let best = null; for (const s of sprites) { const d = Math.hypot(s.x + 2 - x, s.y + 4 - y); if (d < (best?.d ?? 8)) best = {s, d}; }
+    if (best) document.getElementById('pinfo').textContent = passengerTrip(best.s);
+  };
+  document.getElementById('mclose').onclick = () => document.getElementById('modal').style.display = 'none';
+}
+let last = performance.now(), lastUi = 0;
+function loop(now) {
+  const dt = Math.min(0.25, (now - last) / 1000); last = now;
+  if (playing) { t += dt * speed; if (t >= 1440) t = 330; }
+  const busy = draw();
+  if (you && t >= you.board - 3 && t <= you.arrive + 1 && you.train.x != null && trainPos(you.train, t)) follow(you.train.x, you.train.y);
+  if (now - lastUi > 500) {
+    lastUi = now; document.getElementById('tslider').value = Math.floor(t); renderTrip();
+    document.getElementById('busy').innerHTML = busy.sort((a, b) => b.ld - a.ld).slice(0, 6).map(tr => {
+      const r = tr.r; return `<div class="stop"><span style="color:${r.color}">${r.key}</span><span>${r.stops[tr.p.i].s.name} → ${r.stops[tr.p.j].s.name}</span>` +
+      `<div class="bar"><i style="width:${Math.min(100, tr.ld * 100 / 1.4)}%;background:${loadCol(tr.ld)}"></i></div></div>`; }).join('') || '<span class="mute">No trains running (service hours 05:30–24:00).</span>';
+  }
+  requestAnimationFrame(loop);
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner</title>
+<style>
+  body { margin:0; background:#14161a; color:#e9ecf1; font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:28px 18px 60px; }
+  h1 { font-size:28px; margin:0 0 6px; } p { color:#c3c9d3; } a { color:#f2c14e; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:22px 0; }
+  .card { background:#1d2026; border:1px solid #2b3038; border-radius:12px; padding:16px; text-decoration:none; color:inherit; display:block; }
+  .card:hover { border-color:#f2c14e; } .card b { display:block; font-size:18px; color:#f2c14e; margin-bottom:4px; }
+  .mute { color:#9aa3ae; font-size:13px; } #s { font-size:14px; }
+</style>
+</head>
+<body><div style="position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#f2c14e;color:#111;font:600 12px system-ui;text-align:center;padding:4px">Frozen v1 snapshot (17 Nov 2026) · <a href="../" style="color:#111">open the live version</a></div><main>
+  <h1>SG Transit Planner</h1>
+  <p>An open-source tool that uses public data to find where Singaporeans live more than a 10-minute walk from any MRT station, today and after every line LTA has announced, and suggests where new stations and lines could go. It gives more weight to homes whose nearest station is already packed at rush hour.</p>
+  <div class="cards">
+    <a class="card" href="map.html"><b>Gap map →</b>Underserved homes, new BTO and land-sale sites, LTA's planned network by year, and proposed lines with the reasons for each.</a>
+    <a class="card" href="compare.html"><b>Ridership compare →</b>Month on month, year on year or any 2 months, for one station, your stations, a line or the whole network.</a>
+    <a class="card" href="report.html"><b>Early wakers &amp; night owls →</b>Which stations wake earliest and sleep latest, whether distance from the CBD explains it, and the busiest point-to-point trips.</a>
+    <a class="card" href="insights.html"><b>Deep dive →</b>Hidden line changes, who buses to the MRT, minutes on the train by town, station personalities, weekends, and trips that don't come back by MRT.</a>
+    <a class="card" href="heartbeat.html"><b>24-hour heartbeat →</b>Every station-to-station trip pulsing through one weekday.</a>
+    <a class="card" href="sim.html"><b>Pixel MRT sim →</b>Watch rush hour build up train by train. Tap a train to look inside, and ride Jurong East → Raffles Place.</a>
+  </div>
+  <div id="s" class="mute"></div>
+  <p class="mute">Data: LTA DataMall (passenger volume, platform crowd), URA Master Plan 2019 rail layer, HDB Property Information via data.gov.sg, HDB building footprints, LTA/URA/HDB announcements (sources are listed in the data files). Built to support planners, not to replace them. Proposals are screening-level, not engineering alignments. <a href="https://github.com/weitanjun123/sg-transit-planner">Source code (MIT)</a></p>
+</main>
+<script>
+fetch('data/analysis.json', {cache:'no-store'}).then(r => r.json()).then(a => {
+  const f = n => Math.round(n).toLocaleString('en-SG');
+  document.getElementById('s').innerHTML = `Last run ${a.generated}: ${f(a.summary.residents_now)} HDB residents mapped · ${f(a.summary.unserved_now)} beyond a 10-min walk today · ${f(a.summary.unserved_after_lta_plans)} still beyond after LTA's plans · ${a.lines.length} proposed line(s).`;
+}).catch(() => {});
+</script>
+</body>
+</html>
