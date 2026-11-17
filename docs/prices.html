@@ -52,6 +52,15 @@
   <p class="lead" id="whyLead"></p>
   <div class="card"><table id="why"></table><div class="mute" style="margin-top:6px">"Expected" = what the town's distance to Raffles Place and typical flat age predict. The gap is everything else: views, estate, flat size, scarcity, schools, amenities. Big flats cost less per sq ft, so towns with large flats look cheaper on $psf.</div></div>
 
+  <h2 id="pay">What do buyers pay to live near things?</h2>
+  <p class="lead" id="payLead"></p>
+  <div class="card"><table id="payT"></table><div class="mute" style="margin-top:6px" id="payNote"></div></div>
+  <div class="card"><h3>Where the city is short of everyday amenities</h3><table id="cov"></table><div class="mute" style="margin-top:6px">Share of HDB blocks (with recent sales) that have each amenity within reach, by distance from Raffles Place.</div></div>
+
+  <h2 id="grants">How many families buy near their parents?</h2>
+  <p class="lead" id="grLead"></p>
+  <div class="card"><div id="grChart"></div><details><summary>Every grant type, households per year</summary><table id="grT"></table></details><div class="mute" style="margin-top:6px" id="grNote"></div></div>
+
   <h2>Most and least expensive HDB towns (last 12 months)</h2>
   <div class="card" id="towns"></div>
   <p class="mute">Sources: HDB resale flat prices from Jan 2017 (data.gov.sg), placed by block and street. Private: URA Data Service residential transactions. $psf = price ÷ floor area. Straight-line distances. These are associations, not proof that the MRT caused a price change; flat age, size, floor and estate also matter. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/prices.py">scripts/prices.py</a>.</p>
@@ -105,6 +114,26 @@ function townChart() {
     $('why').innerHTML = '<tr><th>Town</th><th>Actual</th><th>Expected</th><th>Gap</th><th>km to CBD</th><th>Built</th><th>≤400 m MRT</th><th>Size</th></tr>' + Y.towns.map(t =>
       `<tr><td>${t.town}</td><td>$${fmt(t.psf)}</td><td>$${fmt(t.predicted)}</td><td><span class="${t.gap >= 0 ? 'up' : 'down'}">${t.gap >= 0 ? '+' : '−'}$${Math.abs(t.gap)}</span></td><td>${t.km_cbd}</td><td>~${t.built}</td><td>${t.near_mrt_pct}%</td><td>${t.sqm} sqm</td></tr>`).join('');
   }
+  const AM = H.amenities;
+  if (AM) {
+    const C = AM.controls;
+    $('payLead').innerHTML = `Every HDB resale in the last 12 months (${fmt(AM.sales)} sales), comparing flats that are the same distance from the CBD and the MRT, the same age and the same size. Being 1 km further from Raffles Place costs <b>$${Math.abs(C.per_km_from_cbd)} psf</b>, so each amenity is also shown as "worth the same as being X km closer to the city".`;
+    $('payT').innerHTML = '<tr><th>Amenity</th><th>$psf</th><th>= km closer to CBD</th><th>Blocks that have it</th></tr>' + AM.effects.map(e =>
+      `<tr><td>${e.label}</td><td><span class="${e.sure ? (e.psf >= 0 ? 'up' : 'down') : 'mute'}">${e.psf >= 0 ? '+' : '−'}$${Math.abs(e.psf)}</span>${e.sure ? '' : ' <span class="mute">(unclear)</span>'}</td><td>${e.km_cbd_equiv == null ? '–' : (e.km_cbd_equiv >= 0 ? '' : '−') + Math.abs(e.km_cbd_equiv) + ' km'}</td><td>${e.share_of_blocks}%</td></tr>`).join('');
+    $('payNote').textContent = `"Unclear" = within the margin of error (the estimate is less than 2× its standard error). A negative value usually means the amenity sits in older or busier estates (noise, crowds, school traffic), not that people dislike it. This shows what buyers pay, not whether the amenity makes them move. Places counted: ${Object.entries(AM.places).filter(([, n]) => n).map(([k, n]) => `${n} ${k.replace('_', ' ')}`).join(', ')}. Model fit R² ${AM.r2}.`;
+    const keys = AM.effects.map(e => e.key);
+    $('cov').innerHTML = '<tr><th>Distance from CBD</th><th>Blocks</th>' + AM.effects.map(e => `<th>${e.label.split(' within')[0]}</th>`).join('') + '</tr>' +
+      AM.coverage.map(c => `<tr><td>${c.band}</td><td>${fmt(c.blocks)}</td>${keys.map(k => `<td>${c[k]}%</td>`).join('')}</tr>`).join('');
+  } else { $('payLead').textContent = 'Amenity data not downloaded yet — the data bot adds it on its next run.'; }
+  const GR = H.grants;
+  if (GR) {
+    const yrs = GR.years.filter(y => GR.near_or_with_family[y]), max = Math.max(...yrs.map(y => GR.near_or_with_family[y]));
+    const last = yrs[yrs.length - 1], sh = GR.share_of_resale_pct;
+    $('grLead').innerHTML = `Households given a housing grant for buying a flat with or near (within 4 km of) their parents or married children, per HDB financial year (April–March). In FY${last}: <b>${fmt(GR.near_or_with_family[last])}</b> households${sh[last] ? `, about <b>${sh[last]}%</b> of all HDB resale purchases that year` : ''}.`;
+    $('grChart').innerHTML = yrs.map(y => `<div class="row"><span>FY${y}</span><div class="bar"><i style="width:${GR.near_or_with_family[y] / max * 100}%;background:var(--gold)"></i></div><span class="num">${fmt(GR.near_or_with_family[y])}${sh[y] ? ` · ${sh[y]}%` : ''}</span></div>`).join('');
+    $('grT').innerHTML = '<tr><th>Grant</th>' + GR.years.map(y => `<th>${y}</th>`).join('') + '</tr>' + Object.entries(GR.by_type).map(([k, v]) => `<tr><td>${k}</td>${GR.years.map(y => `<td>${v[y] ? fmt(v[y]) : '–'}</td>`).join('')}</tr>`).join('');
+    $('grNote').innerHTML = `Proximity Housing Grant from Aug 2015 (resale flats only); earlier years use the older CPF grant for living near parents. % = share of that year's HDB resale purchases. National totals only — HDB does not publish this by town. Source: <a href="${GR.source}">HDB, CPF Housing Grants Awarded by Type</a>.`;
+  } else { $('grLead').textContent = 'Grant data not downloaded yet — the data bot adds it on its next run.'; }
   const tt = Object.entries(H.town_median_psf_12m), tmax = tt[0][1];
   $('towns').innerHTML = tt.map(([t, v]) => `<div class="row"><span>${t}</span><div class="bar"><i style="width:${v / tmax * 100}%;background:var(--gold)"></i></div><span class="num">$${fmt(v)}</span></div>`).join('');
   $('lines').innerHTML = '<tr><th>Line</th><th>HDB blocks</th><th>HDB $psf</th><th>Private projects</th><th>Private $psf</th></tr>' +

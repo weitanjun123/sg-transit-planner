@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install requests
+      - run: pip install requests numpy
 
       - name: LTA DataMall (crowd + passenger volume)
         env:
@@ -39,6 +39,10 @@ jobs:
         env:
           URA_ACCESS_KEY: ${{ secrets.URA_ACCESS_KEY }}
         run: python scripts/fetch_prices.py
+        continue-on-error: true
+
+      - name: Amenities (schools, hawkers, clinics, parks...) + housing grant counts
+        run: python scripts/fetch_amenities.py
         continue-on-error: true
 
       - name: Early wakers / night owls report

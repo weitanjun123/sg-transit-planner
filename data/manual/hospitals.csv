@@ -1,0 +1,11 @@
+name,lat,lon,type,source
+Singapore General Hospital,1.2795,103.8350,public acute,approximate location (Outram)
+Tan Tock Seng Hospital,1.3214,103.8458,public acute,approximate location (Novena)
+National University Hospital,1.2937,103.7831,public acute,approximate location (Kent Ridge)
+Changi General Hospital,1.3402,103.9496,public acute,approximate location (Simei)
+Khoo Teck Puat Hospital,1.4244,103.8383,public acute,approximate location (Yishun)
+Ng Teng Fong General Hospital,1.3337,103.7457,public acute,approximate location (Jurong East)
+Sengkang General Hospital,1.3955,103.8935,public acute,approximate location (Sengkang)
+Alexandra Hospital,1.2867,103.8010,public acute,approximate location (Queenstown)
+KK Women's and Children's Hospital,1.3104,103.8464,public acute,approximate location (Kandang Kerbau)
+Woodlands Hospital,1.4250,103.7951,public acute,approximate location (Woodlands Health Campus)

@@ -39,6 +39,112 @@ def mshift(m, k):
     return f"{y}-{mo:02d}"
 
 
+AMENITIES = [  # (key in points.json, label, radius km, how it enters the model)
+    ("primary_schools", "Primary school within 1 km", 1.0, "count3"),
+    ("secondary_schools", "Secondary school within 1 km", 1.0, "any"),
+    ("hawker", "Hawker centre within 500 m", 0.5, "any"),
+    ("supermarkets", "Supermarket within 400 m", 0.4, "any"),
+    ("clinics", "GP clinics within 400 m", 0.4, "count5"),
+    ("polyclinics", "Polyclinic within 1 km", 1.0, "any"),
+    ("hospitals", "Public hospital within 2 km", 2.0, "any"),
+    ("parks", "Park within 400 m", 0.4, "any"),
+]
+
+
+def amenity_model(sales, m12, near_cache, km):
+    """What buyers pay for: $psf on each amenity, holding distance to the CBD, flat age, size and MRT distance fixed."""
+    path = "data/raw/amenities/points.json"
+    if not os.path.exists(path):
+        return None
+    import numpy as np
+    pts = json.load(open(path))
+    use = [a for a in AMENITIES if len(pts.get(a[0], [])) >= 5]
+    recent = [s for s in sales if s["month"] >= m12]
+    keys = sorted({s["k"] for s in recent})
+    kpos = {k: i for i, k in enumerate(keys)}
+    first = {}
+    for s in recent:
+        first.setdefault(s["k"], (s["lat"], s["lon"]))
+    lat = np.array([first[k][0] for k in keys]); lon = np.array([first[k][1] for k in keys])
+    kx = 111.32 * math.cos(math.radians(1.35)); ky = 110.57
+    feat = {}
+    for key, label, r, kind in use:
+        P = np.array([[p[0], p[1]] for p in pts[key]])
+        cnt = np.zeros(len(keys)); dmin = np.full(len(keys), 99.0)
+        for i in range(0, len(keys), 500):
+            d = np.hypot((lon[i:i + 500, None] - P[None, :, 1]) * kx, (lat[i:i + 500, None] - P[None, :, 0]) * ky)
+            cnt[i:i + 500] = (d <= r).sum(1); dmin[i:i + 500] = d.min(1)
+        feat[key] = np.minimum(cnt, 3) if kind == "count3" else np.minimum(cnt, 5) if kind == "count5" else (cnt > 0).astype(float)
+        feat[key + "_dmin"] = dmin
+    RP = (1.28393, 103.85143)
+    cbd = np.hypot((lon - RP[1]) * kx, (lat - RP[0]) * ky)
+    rows, y = [], []
+    for s in recent:
+        i = kpos[s["k"]]
+        sqm = s["price"] / s["psf"] / SQM_TO_SQFT
+        rows.append([1.0, cbd[i], s["lease"], sqm, min(near_cache[s["k"]][0], 2.0)] + [feat[a[0]][i] for a in use])
+        y.append(s["psf"])
+    X, y = np.array(rows), np.array(y)
+    beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+    resid = y - X @ beta
+    # standard errors clustered by block (sales in the same block are not independent)
+    blk = np.array([kpos[s["k"]] for s in recent])
+    XtX_inv = np.linalg.inv(X.T @ X)
+    G = np.zeros((len(keys), X.shape[1])); np.add.at(G, blk, X * resid[:, None]); meat = G.T @ G
+    se = np.sqrt(np.diag(XtX_inv @ meat @ XtX_inv))
+    r2 = 1 - (resid ** 2).sum() / ((y - y.mean()) ** 2).sum()
+    per_km = beta[1]
+    out = {"sales": len(y), "blocks": len(keys), "r2": round(float(r2), 2), "mean_psf": round(float(y.mean())),
+           "controls": {"per_km_from_cbd": round(float(per_km), 1), "per_year_newer": round(float(beta[2]), 1),
+                        "per_sqm_bigger": round(float(beta[3]), 2), "per_km_from_mrt": round(float(beta[4]), 1)},
+           "effects": [], "coverage": [], "places": {a[0]: len(pts.get(a[0], [])) for a in AMENITIES}}
+    for j, (key, label, r, kind) in enumerate(use):
+        b, e = float(beta[5 + j]), float(se[5 + j])
+        out["effects"].append({"key": key, "label": label + (" (each, up to 3)" if kind == "count3" else " (each, up to 5)" if kind == "count5" else ""),
+                               "psf": round(b, 1), "se": round(e, 1), "sure": abs(b) > 2 * e,
+                               "km_cbd_equiv": round(b / -per_km, 2) if per_km < 0 else None,
+                               "share_of_blocks": round(100 * float((feat[key] > 0).mean()))})
+    for lo, hi, nm in [(0, 5, "within 5 km of the CBD"), (5, 10, "5–10 km"), (10, 15, "10–15 km"), (15, 99, "over 15 km")]:
+        m = (cbd >= lo) & (cbd < hi)
+        if m.sum() < 20:
+            continue
+        out["coverage"].append({"band": nm, "blocks": int(m.sum()),
+                                **{a[0]: round(100 * float((feat[a[0]][m] > 0).mean())) for a in use}})
+    print(f"amenities: {len(use)} types, {len(y)} sales, R2 {r2:.2f}")
+    return out
+
+
+def grants_summary(sales_by_fy):
+    p = "data/raw/grants/cpf_housing_grants.json"
+    if not os.path.exists(p):
+        return None
+    G = json.load(open(p))
+    near, other_near, total = defaultdict(int), defaultdict(int), defaultdict(int)
+    types = defaultdict(lambda: defaultdict(int))
+    num = lambda v: int(float(v)) if str(v).replace(".", "", 1).isdigit() else 0
+    for r in G["records"]:
+        fy = str(r.get("financial_year", "")).strip(); sch = r.get("housing_grant_scheme", ""); ty = r.get("type_of_grant", ""); n = num(r.get("no_of_hh"))
+        if not fy.isdigit():
+            continue
+        label = f"{sch} – {ty}" if ty and ty.lower() != "na" else sch
+        types[label][fy] += n
+        total[fy] += n
+        txt = f"{sch} {ty}".lower()
+        if "proximity" in txt:
+            near[fy] += n
+        elif "near" in txt or "living with" in txt:
+            other_near[fy] += n            # older CPF Housing Grant variants for living with/near parents (before the PHG)
+    years = sorted(total)
+    for y in years:
+        if not near[y]:
+            near[y] = other_near[y]
+    return {"source": G["source"], "years": years,
+            "near_or_with_family": {y: near[y] for y in years},
+            "resale_sales": {y: sales_by_fy.get(y) for y in years},
+            "share_of_resale_pct": {y: round(100 * near[y] / sales_by_fy[y], 1) for y in years if sales_by_fy.get(y) and near[y]},
+            "by_type": {k: dict(v) for k, v in sorted(types.items())}}
+
+
 def main():
     st = json.load(open("docs/data/stations.json"))
     now_year = dt.date.today().year + dt.date.today().timetuple().tm_yday / 366
@@ -177,9 +283,16 @@ def main():
                "towns": [{"town": r["town"], "psf": round(r["psf"]), "predicted": round(r["predicted"]), "gap": round(r["psf"] - r["predicted"]),
                           "built": round(r["built"]), "km_cbd": round(r["km_cbd"], 1), "near_mrt_pct": round(r["near_mrt_pct"]), "sqm": round(r["sqm"]), "sales": r["sales"]}
                          for r in sorted(trows, key=lambda r: -r["psf"])]}
-        out["hdb"] = {"town_why": why, "latest_month": last, "sales_used": len(sales), "sales_unplaced": miss, "blocks": blocks,
+        amen = amenity_model(sales, m12, near_cache, km)
+        out["hdb"] = {"town_why": why, "amenities": amen, "latest_month": last, "sales_used": len(sales), "sales_unplaced": miss, "blocks": blocks,
                       "towns_monthly": towns_monthly, "town_median_psf_12m": {t: round(v) for t, v in sorted(town12.items(), key=lambda kv: -kv[1])},
                       "mrt_premium": premium, "new_station_effect": effects}
+        fy, fy_months = defaultdict(int), defaultdict(set)
+        for r in csv.DictReader(open(path, encoding="utf-8")):
+            y, mo = int(r["month"][:4]), int(r["month"][5:7])
+            k = str(y if mo >= 4 else y - 1)            # HDB financial year starts in April
+            fy[k] += 1; fy_months[k].add(r["month"])
+        out["hdb"]["grants"] = grants_summary({k: v for k, v in fy.items() if len(fy_months[k]) == 12})
         print(f"HDB: {len(sales)} sales placed ({miss} not matched), {len(blocks)} blocks, latest {last}")
 
     # ------------------------------------------------------------ URA private
