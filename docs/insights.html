@@ -25,9 +25,9 @@
 </head>
 <body><main>
   <h1>Deep dive: how Singapore really rides</h1>
-  <div class="mute"><a href="./">home</a> · <a href="economics.html">money test</a> · <a href="map.html">gap map</a> · <a href="report.html">early wakers</a> · <a href="compare.html">compare</a> · <a href="sim.html">pixel sim</a> · <a href="heartbeat.html">24-hour heartbeat</a></div>
+  <div class="mute"><a href="./">home</a> · <a href="future.html">2030 test</a> · <a href="watch.html">watch list</a> · <a href="economics.html">money test</a> · <a href="map.html">gap map</a> · <a href="report.html">early wakers</a> · <a href="compare.html">compare</a> · <a href="sim.html">pixel sim</a> · <a href="heartbeat.html">24-hour heartbeat</a></div>
   <p class="mute" id="meta"></p>
-  <nav class="toc"><a href="#t1">1 Hidden transfers</a><a href="#t2">2 Bus to MRT</a><a href="#t3">3 Commute minutes</a><a href="#t4">4 Station types</a><a href="#t5">5 Weekends</a><a href="#t6">6 Morning vs evening</a><a href="heartbeat.html">7 Heartbeat ▶</a></nav>
+  <nav class="toc"><a href="#t1">1 Hidden transfers</a><a href="#t2">2 Bus to MRT</a><a href="#t3">3 Commute minutes</a><a href="#t4">4 Station types</a><a href="#t5">5 Weekends</a><a href="#t6">6 Morning vs evening</a><a href="#t7">7 Local jobs</a><a href="heartbeat.html">8 Heartbeat ▶</a></nav>
 
   <h2 id="t1">1 · The hidden load: people changing lines</h2>
   <p class="lead">Tap data only counts people entering and leaving a station. Changing lines inside an interchange is invisible, so every LTA trip is routed along the fastest path to estimate it.</p>
@@ -54,7 +54,13 @@
   <p class="lead">For every morning trip (6–10am) from A to B, is there a matching B → A trip later that day? A low share means people get home another way (bus, car, private-hire, walking) or come back somewhere else.</p>
   <div class="grid"><div class="card"><h3>Stations whose riders come back by MRT least</h3><div id="mmSt"></div></div><div class="card"><h3>Morning trips with the fewest MRT trips back</h3><table id="mmPairs"></table></div></div>
 
-  <div class="card" style="margin-top:28px"><b>7 · 24-hour heartbeat →</b> <a href="heartbeat.html">watch every station-to-station flow pulse through a weekday</a></div>
+  <h2 id="t7">7 · Do regions keep their own jobs?</h2>
+  <p class="lead">Singapore's plan is to move jobs out of the city into regional centres so people travel less. Here is where 6–9am weekday MRT trips from each region actually end. "City core" = within 3 km of Raffles Place.</p>
+  <div class="card"><table id="regions"></table></div>
+  <div class="card"><h3>Who arrives at each job centre in the morning (6–10am)</h3><table id="centres"></table></div>
+  <p class="mute" id="regNote"></p>
+
+  <div class="card" style="margin-top:28px"><b>8 · 24-hour heartbeat →</b> <a href="heartbeat.html">watch every station-to-station flow pulse through a weekday</a></div>
   <p class="mute" id="method"></p>
 </main>
 <script>
@@ -97,6 +103,17 @@ function spark(pin, pout) {
   // 6
   bars($('mmSt'), D.mismatch.stations.slice(0, 10), r => 100 - r.come_back_by_mrt_pct, r => r.come_back_by_mrt_pct + '%', 'var(--blue)', r => `${fmt(r.am_out_per_day)} morning trips out`);
   $('mmPairs').innerHTML = `<tr><th>Morning trip</th><th>a day</th><th>back by MRT</th></tr>` + D.mismatch.pairs.slice(0, 10).map(r => `<tr><td>${r.from} → ${r.to}</td><td>${fmt(r.am_per_day)}</td><td>${r.back_pct}%</td></tr>`).join('');
+  // 7
+  if (D.regions) {
+    const pc = v => v == null ? '–' : v + '%';
+    $('regions').innerHTML = `<tr><th>Home region</th><th>Morning trips / day</th><th>Stay in own region</th><th>To city core</th><th>To rest of Central</th></tr>` + D.regions.map(r =>
+      `<tr><td>${r.region}</td><td>${fmt(r.am_trips_per_day)}</td><td><b>${pc(r.stay_in_region_pct)}</b></td><td>${pc(r.to_city_core_pct)}</td><td>${r.region === 'Central' ? '–' : pc(r.to_central_pct)}</td></tr>`).join('');
+    $('centres').innerHTML = `<tr><th>Centre</th><th>Arrivals / day</th><th>From its own region</th><th>Top origins</th></tr>` + D.centres.map(c =>
+      `<tr><td>${c.centre}<br><span class="mute">${c.region} region</span></td><td>${fmt(c.am_arrivals_per_day)}</td><td><b>${pc(c.from_own_region_pct)}</b></td><td class="mute">${Object.entries(c.from).slice(0, 3).map(([k, v]) => `${k} ${v}%`).join(' · ')}</td></tr>`).join('');
+    const W = D.regions.find(r => r.region === 'West'), N = D.regions.find(r => r.region === 'North');
+    const WC = D.centres.find(c => c.centre.startsWith('Woodlands'));
+    $('regNote').textContent = `Reading it: the West keeps ${W.stay_in_region_pct}% of its morning trips in the West, the North only ${N.stay_in_region_pct}%. Woodlands Regional Centre gets ${WC.from.North}% of its morning arrivals from the North and ${WC.from.West || 0}% from the West. Only MRT trips are counted, so short bus or walk trips to local jobs are missing, which understates "staying local" everywhere.`;
+  }
   const A = D.assumptions;
   $('method').innerHTML = `Trips are routed on today's open network (MRT at ~${A.speed_kmh.MRT} km/h, LRT ~${A.speed_kmh.LRT} km/h straight-line between stations, ${A.dwell_min} min per stop, ${A.transfer_min} min per line change), so line-change counts are model estimates, not counts. LTA records where people tap out, which may be a bus interchange rather than their final stop. Bus stops: LTA BusStops. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/insights.py">scripts/insights.py</a>.`;
 })();

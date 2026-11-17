@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner — 2030 crowding stress test</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --blue:#5aa9ff; --red:#e5484d; --green:#3fbf7f; --line:#2b3038; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:18px 14px 70px; }
+  h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:18px; margin:32px 0 4px; } h3 { font-size:14px; margin:8px 0 6px; }
+  a { color:var(--gold); } .mute { color:var(--mute); font-size:13px; } .lead { color:#cfd5de; margin:4px 0 10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; overflow-x:auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { padding:6px 5px; border-bottom:1px solid var(--line); text-align:right; vertical-align:top; }
+  td:first-child, th:first-child { text-align:left; } th { color:var(--mute); font-weight:500; }
+  .good { color:var(--green); font-weight:600; } .bad { color:var(--red); font-weight:600; } .mid { color:var(--gold); font-weight:600; }
+  .big { font-size:24px; font-weight:700; }
+  .pill { display:inline-block; border-radius:10px; padding:1px 8px; font-size:12px; background:#2c313b; }
+  details { margin-top:8px; } summary { cursor:pointer; color:var(--gold); }
+</style>
+</head>
+<body><main>
+  <h1>2030 crowding stress test</h1>
+  <div class="mute"><a href="./">home</a> · <a href="map.html">gap map</a> · <a href="insights.html">deep dive</a> · <a href="economics.html">money test</a> · <a href="future.html">2030 test</a> · <a href="watch.html">watch list</a></div>
+  <p class="lead">Today's weekday 7–9am trips, routed on today's network and again on the network LTA plans to have open by mid-2030, with the new BTO and land-sale homes' residents added. Which stretches get busier, which get relief, and how full do the new lines start out?</p>
+  <div class="grid" id="head"></div>
+  <p class="mute" id="lines"></p>
+  <h2>Getting busier</h2><p class="lead">Riders per hour on the stretch, 7–9am, and how full that is (100% = every train packed including standees).</p>
+  <div class="card"><table id="busier"></table></div>
+  <h2>Getting relief</h2><div class="card"><table id="relief"></table></div>
+  <h2>The new lines on day one</h2><p class="lead">A floor, not a forecast: only people already on the network who find the new line faster, plus new homes. People who switch from bus or car, and new jobs, would add more.</p>
+  <div class="card"><table id="newl"></table></div>
+  <h2>Fullest stretches in 2030</h2><div class="card"><table id="full"></table></div>
+  <h2>Interchanges: more or fewer line changes</h2><div class="card"><table id="xf"></table></div>
+  <details class="card"><summary>New homes added (BTO launches + land sales)</summary><table id="homes"></table></details>
+  <p class="mute" id="method"></p>
+</main>
+<script>
+const $ = id => document.getElementById(id), fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
+const cls = p => p >= 85 ? 'bad' : p >= 60 ? 'mid' : 'good';
+const tbl = rows => `<tr><th>Stretch</th><th>Now / hr</th><th>2030 / hr</th><th>Change</th><th>Full now → 2030</th></tr>` + rows.map(r =>
+  `<tr><td>${r.stretch}<br><span class="mute">${r.line}</span></td><td>${fmt(r.now)}</td><td>${fmt(r.y2030)}</td><td class="${r.change > 0 ? 'bad' : 'good'}">${r.change > 0 ? '+' : ''}${fmt(r.change)}${r.change_pct != null ? ` <span class="mute">(${r.change_pct > 0 ? '+' : ''}${r.change_pct}%)</span>` : ''}</td><td><span class="${cls(r.load_now_pct)}">${r.load_now_pct}%</span> → <span class="${cls(r.load_2030_pct)}">${r.load_2030_pct}%</span></td></tr>`).join('');
+(async () => {
+  let F; try { F = await (await fetch('data/future.json', {cache:'no-store'})).json(); } catch (e) { $('head').innerHTML = '<div class="card">Not published yet — the data bot builds this on its next run.</div>'; return; }
+  const yr = Math.floor(F.year), half = F.year % 1 >= 0.5 ? 'mid-' : '';
+  $('head').innerHTML = [
+    ['Morning trips / hr today', fmt(F.trips_per_hour_now)], ['Added by new homes', '+' + fmt(F.added_trips_per_hour)],
+    ['Avg train time today', F.avg_minutes_now + ' min'], [`Avg train time ${half}${yr}`, F.avg_minutes_2030 + ' min']].map(([k, v]) => `<div class="card"><div class="mute">${k}</div><div class="big">${v}</div></div>`).join('');
+  $('lines').textContent = `Network by ${half}${yr}: ${F.new_stations.length} new stations on ${F.lines_added.join(', ')}. JRL stages 2–3 have no official date; this test assumes they open by then.`;
+  $('busier').innerHTML = tbl(F.busier.slice(0, 12)); $('relief').innerHTML = tbl(F.relief.slice(0, 12));
+  $('newl').innerHTML = tbl(F.new_line_loads.slice(0, 14)); $('full').innerHTML = tbl(F.fullest_2030);
+  $('xf').innerHTML = `<tr><th>Station</th><th>Line changes / hr now</th><th>2030</th><th>Change</th></tr>` + F.interchanges.map(r => `<tr><td>${r.name}</td><td>${fmt(r.now)}</td><td>${fmt(r.y2030)}</td><td class="${r.change > 0 ? 'bad' : 'good'}">${r.change > 0 ? '+' : ''}${fmt(r.change)}</td></tr>`).join('');
+  $('homes').innerHTML = `<tr><th>Site</th><th>Homes</th><th>Nearest station (2030)</th><th>km</th><th>7–9am trips / day</th></tr>` + F.new_homes.map(h => `<tr><td>${h.name}</td><td>${fmt(h.units)}</td><td>${h.station}</td><td>${h.km}</td><td>${fmt(h.am_trips)}</td></tr>`).join('');
+  const A = F.assumptions;
+  $('method').innerHTML = `Trips: LTA origin–destination data for ${F.months.join(', ')}, average weekday. New homes: ${A.persons_per_unit} people per home, ${A.rail_share * 100}% use the MRT, ${Math.round(A.am_share * 100)}% of a day's trips start 7–9am (from LTA data), heading where today's riders from the nearest station go. Capacity per train and trains per hour are planning assumptions (e.g. NSL/EWL ${A.capacity.NS} people × ${A.trains_per_hour.NS} trains). ${A.note} Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/future.py">scripts/future.py</a>.`;
+})();
+</script>
+</body>
+</html>

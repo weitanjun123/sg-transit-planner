@@ -362,6 +362,46 @@ def main():
            "personalities": pers, "weekend": {"magnets": wk_rows[:20], "commuter_only": wk_rows[-15:][::-1]},
            "mismatch": {"stations": mm_rows[:20], "best_return": mm_rows[-10:][::-1], "pairs": pair_rows},
            "bus": bus}
+    # ---------------------------------------------------------------- 4b: do regions keep their own jobs?
+    REGION = {"Woodlands": "North", "Sembawang": "North", "Yishun": "North",
+              "Ang Mo Kio": "North-East", "Hougang": "North-East", "Punggol": "North-East", "Sengkang": "North-East", "Serangoon": "North-East",
+              "Bedok": "East", "Pasir Ris": "East", "Tampines": "East",
+              "Bukit Batok": "West", "Bukit Panjang": "West", "Choa Chu Kang": "West", "Clementi": "West", "Jurong East": "West", "Jurong West": "West", "Tengah": "West"}
+    RP = (1.28393, 103.85143)
+    region_of = {}
+    with_town = [x for x in open_now if x in town_of]
+    for sid in open_now:
+        if km(pos[sid], RP) < 3.0:
+            region_of[sid] = "City core"; continue
+        t = town_of.get(sid) or town_of[min(with_town, key=lambda y: km(pos[sid], pos[y]))]
+        region_of[sid] = REGION.get(t, "Central")
+    CENTRES = {"Jurong Lake District": ["Jurong East", "Chinese Garden", "Lakeside"], "Woodlands Regional Centre": ["Woodlands", "Woodlands South", "Woodlands North"],
+               "Tampines Regional Centre": ["Tampines", "Tampines East", "Tampines West"], "Punggol Digital District": ["Punggol Coast", "Punggol"],
+               "one-north / Buona Vista": ["one-north", "Buona Vista", "Kent Ridge"], "Paya Lebar": ["Paya Lebar"], "City core (Raffles Place area)": None}
+    reg = defaultdict(lambda: defaultdict(float))
+    for (dt_, h, o, d), v in od.items():
+        if dt_ == "weekday" and h in (6, 7, 8) and o in region_of and d in region_of:
+            reg[region_of[o]][region_of[d]] += v
+    regions_out = []
+    for rname in ["North", "North-East", "East", "West", "Central"]:
+        row = reg.get(rname, {}); tot = sum(row.values()) or 1
+        regions_out.append({"region": rname, "am_trips_per_day": round(tot), "stay_in_region_pct": round(100 * row.get(rname, 0) / tot, 1),
+                            "to_city_core_pct": round(100 * row.get("City core", 0) / tot, 1),
+                            "to_central_pct": round(100 * row.get("Central", 0) / tot, 1),
+                            "to": {k: round(100 * v / tot, 1) for k, v in sorted(row.items(), key=lambda kv: -kv[1])}})
+    nm2sid = {S[x]["name"]: x for x in open_now}
+    centres_out = []
+    for cname, members in CENTRES.items():
+        ids = {x for x, r in region_of.items() if r == "City core"} if members is None else {nm2sid[m] for m in members if m in nm2sid}
+        arr = defaultdict(float)
+        for (dt_, h, o, d), v in od.items():
+            if dt_ == "weekday" and h in (6, 7, 8, 9) and d in ids and o not in ids:
+                arr[region_of.get(o, "?")] += v
+        tot = sum(arr.values()) or 1
+        home = "City core" if members is None else region_of.get(next(iter(ids)), "?") if ids else "?"
+        centres_out.append({"centre": cname, "am_arrivals_per_day": round(sum(arr.values())), "from_own_region_pct": round(100 * arr.get(home, 0) / tot, 1) if members else None,
+                            "region": home, "from": {k: round(100 * v / tot, 1) for k, v in sorted(arr.items(), key=lambda kv: -kv[1])}})
+
     # ---------------------------------------------------------------- per-station + per-segment values for the map
     stype = {x: t["type"] for t in pers for x in []}
     for t in pers:
@@ -387,6 +427,7 @@ def main():
                     "weekend_ratio": round(we / wd, 2) if wd >= 2000 else None, "back_pct": round(back[sid], 1) if sid in back else None,
                     "am_track_load": round(near_load.get(sid, 0))}
     out["per_station"] = per
+    out["regions"] = regions_out; out["centres"] = centres_out
     out["segments_am"] = [[ia, ib, l, round(v)] for (ia, ib, l), v in sorted(seg_am.items(), key=lambda kv: -kv[1])]
     json.dump(out, open("docs/data/insights.json", "w"), separators=(",", ":"))
     print(f"insights.json: {len(tr_rows)} interchanges, {len(pers)} station types, bus={'yes' if bus['available'] else 'no'}; months {months}")

@@ -160,17 +160,25 @@ def crowd(key):
                 live["stations"][st["Station"]] = st["CrowdLevel"]
         except Exception as e:
             print(f"PCDRealTime {line}: {e}")
-    json.dump(forecast, open(f"{OUT}/crowd_forecast.json", "w"), separators=(",", ":"))
-    json.dump(live, open(f"{OUT}/crowd_now.json", "w"), separators=(",", ":"))
     os.makedirs(RAW, exist_ok=True)
-    json.dump(forecast, open(f"{RAW}/crowd_forecast_{now:%Y%m%d}.json", "w"), separators=(",", ":"))
-    os.makedirs(f"{RAW}/crowd_live", exist_ok=True)
-    json.dump(live, open(f"{RAW}/crowd_live/{now:%Y%m%d_%H%M}.json", "w"), separators=(",", ":"))
+    fpath = f"{RAW}/crowd_forecast_{now:%Y%m%d}.json"
+    if forecast["stations"] and not (os.path.exists(fpath) and len(json.load(open(fpath)).get("stations", {})) > len(forecast["stations"])):
+        # never let an empty or partial LTA reply replace a fuller forecast already saved for today
+        json.dump(forecast, open(f"{OUT}/crowd_forecast.json", "w"), separators=(",", ":"))
+        json.dump(forecast, open(fpath, "w"), separators=(",", ":"))
+    if live["stations"]:
+        json.dump(live, open(f"{OUT}/crowd_now.json", "w"), separators=(",", ":"))
+        os.makedirs(f"{RAW}/crowd_live", exist_ok=True)
+        json.dump(live, open(f"{RAW}/crowd_live/{now:%Y%m%d_%H%M}.json", "w"), separators=(",", ":"))
     print(f"crowd: forecast for {len(forecast['stations'])} stations, live for {len(live['stations'])}")
 
 
 if __name__ == "__main__":
     key = os.environ.get("LTA_ACCOUNT_KEY")
+    if "--crowd-only" in sys.argv:          # used by the every-30-minutes peak-hour workflow
+        if not key:
+            sys.exit("LTA_ACCOUNT_KEY not set")
+        os.makedirs(OUT, exist_ok=True); crowd(key); sys.exit(0)
     if not key:
         sys.exit("LTA_ACCOUNT_KEY not set - add it as a repo secret")
     os.makedirs(OUT, exist_ok=True)

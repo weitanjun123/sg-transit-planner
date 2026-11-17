@@ -60,10 +60,18 @@ jobs:
         run: python scripts/economics.py
         continue-on-error: true
 
+      - name: 2030 crowding stress test
+        run: python scripts/future.py
+        continue-on-error: true
+
+      - name: Watch list (rising stations + LTA forecast accuracy)
+        run: python scripts/watch.py
+        continue-on-error: true
+
       - name: Commit data
         run: |
           git config user.name "sg-transit-planner-bot"
           git config user.email "actions@users.noreply.github.com"
           git add data docs/data
           git diff --cached --quiet || git commit -m "data: $(TZ=Asia/Singapore date +'%Y-%m-%d %H:%M') SGT"
-          git push
+          for i in 1 2 3; do git pull --rebase -X theirs && git push && break; sleep 10; done

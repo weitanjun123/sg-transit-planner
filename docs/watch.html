@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner — Watch list</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --blue:#5aa9ff; --red:#e5484d; --green:#3fbf7f; --line:#2b3038; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:18px 14px 70px; }
+  h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:18px; margin:32px 0 4px; } h3 { font-size:14px; margin:8px 0 6px; }
+  a { color:var(--gold); } .mute { color:var(--mute); font-size:13px; } .lead { color:#cfd5de; margin:4px 0 10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; overflow-x:auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { padding:6px 5px; border-bottom:1px solid var(--line); text-align:right; vertical-align:top; }
+  td:first-child, th:first-child { text-align:left; } th { color:var(--mute); font-weight:500; }
+  .good { color:var(--green); font-weight:600; } .bad { color:var(--red); font-weight:600; } .mid { color:var(--gold); font-weight:600; }
+  .big { font-size:24px; font-weight:700; }
+  .pill { display:inline-block; border-radius:10px; padding:1px 8px; font-size:12px; background:#2c313b; }
+  details { margin-top:8px; } summary { cursor:pointer; color:var(--gold); }
+</style>
+</head>
+<body><main>
+  <h1>Watch list</h1>
+  <div class="mute"><a href="./">home</a> · <a href="map.html">gap map</a> · <a href="insights.html">deep dive</a> · <a href="economics.html">money test</a> · <a href="future.html">2030 test</a> · <a href="watch.html">watch list</a></div>
+  <h2>1 · Rising stations</h2>
+  <p class="lead">Stations where weekday ridership is growing faster than the network <i>and</i> HDB resale prices within 600 m are rising faster than the rest of the town — early signs of an area taking off.</p>
+  <p class="mute" id="rMeta"></p>
+  <div class="card"><h3>Both rising</h3><table id="both"></table></div>
+  <div class="grid"><div class="card"><h3>Ridership growing fastest</h3><table id="rUp"></table></div><div class="card"><h3>Prices beating their town most</h3><table id="pUp"></table></div></div>
+  <div class="card"><h3>Ridership falling fastest</h3><table id="rDown"></table></div>
+  <h2>2 · How good is LTA's crowd forecast?</h2>
+  <p class="lead">LTA publishes a forecast of how crowded each platform will be every half hour. The bot saves it each morning, then snapshots the live crowd level every 30 minutes in the weekday peaks and checks one against the other.</p>
+  <div class="grid" id="fHead"></div>
+  <div class="card" id="fNote"></div>
+  <div class="grid"><div class="card"><h3>Forecast vs what happened</h3><table id="matrix"></table></div><div class="card"><h3>Stations the forecast gets wrong most</h3><table id="worst"></table></div></div>
+</main>
+<script>
+const $ = id => document.getElementById(id), fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], mm = m => MON[+m.slice(5) - 1] + ' ' + m.slice(0, 4);
+const sg = v => v == null ? '–' : (v > 0 ? '+' : '') + v;
+const LV = {l: 'Not crowded', m: 'Moderate', h: 'Crowded'};
+(async () => {
+  let W; try { W = await (await fetch('data/watch.json', {cache:'no-store'})).json(); } catch (e) { $('rMeta').textContent = 'Not published yet — the data bot builds this on its next run.'; return; }
+  const R = W.rising;
+  if (R) {
+    $('rMeta').textContent = `Ridership: ${mm(R.from)} vs ${mm(R.to)}, per weekday, compared with the whole network (${sg(R.network_change_pct)}%), so school holidays and seasons cancel out. Prices: last 12 months vs the 12 before, blocks within 600 m vs their town. Only ${R.from === R.to ? 1 : 'a few'} months of LTA data so far, so treat this as an early signal; it firms up each month.`;
+    const row = r => `<tr><td>${r.station}</td><td>${fmt(r.riders_now)}</td><td class="${r.riders_vs_network_pct > 0 ? 'good' : 'bad'}">${sg(r.riders_vs_network_pct)}%</td><td class="${(r.price_vs_town_pts || 0) > 0 ? 'good' : 'bad'}">${sg(r.price_vs_town_pts)}${r.price_vs_town_pts != null ? ' pts' : ''}</td><td>${r.blocks}</td></tr>`;
+    const hd = `<tr><th>Station</th><th>Riders / weekday</th><th>Riders vs network</th><th>Prices vs town</th><th>Blocks</th></tr>`;
+    $('both').innerHTML = R.both.length ? hd + R.both.map(row).join('') : '<tr><td class="mute">None yet.</td></tr>';
+    $('rUp').innerHTML = hd + R.riders_up.slice(0, 10).map(row).join(''); $('pUp').innerHTML = hd + R.prices_up.slice(0, 10).map(row).join('');
+    $('rDown').innerHTML = hd + R.riders_down.slice(0, 10).map(row).join('');
+  }
+  const F = W.forecast, d = F.first_day ? `${F.first_day.slice(6)} ${MON[+F.first_day.slice(4, 6) - 1]} ${F.first_day.slice(0, 4)}` : '';
+  $('fHead').innerHTML = [['Days collected', F.days], ['Live snapshots', F.snapshots], ['Station checks', fmt(F.pairs)], ['Forecast exactly right', F.exact_pct != null ? F.exact_pct + '%' : '–']]
+    .map(([k, v]) => `<div class="card"><div class="mute">${k}</div><div class="big">${v}</div></div>`).join('');
+  const early = F.days < (F.min_days_for_verdict || 10);
+  $('fNote').innerHTML = (early ? `<b class="mid">Collecting since ${d}.</b> A fair verdict needs about ${F.min_days_for_verdict || 10} weekdays of peak-hour snapshots. ` : '') +
+    (F.always_low_pct != null ? `For scale: a lazy forecast that always says "not crowded" would score ${F.always_low_pct}%, so the real test is the crowded moments` +
+      (F.crowded_caught_pct != null ? ` — the forecast caught <b>${F.crowded_caught_pct}%</b> of them, and ${F.crowded_false_alarm_pct ?? '–'}% of its "crowded" calls were false alarms.` : ` (none recorded on a forecast line yet).`) : '') +
+    ` LTA's forecast currently covers ${F.forecast_lines.join(', ')} only.`;
+  if (F.matrix) {
+    $('matrix').innerHTML = `<tr><th>Forecast ↓ / Actual →</th>${Object.values(LV).map(v => `<th>${v}</th>`).join('')}</tr>` + Object.entries(F.matrix).map(([f, row]) =>
+      `<tr><td>${LV[f]}</td>${Object.entries(row).map(([l, n]) => `<td class="${f === l ? 'good' : n ? 'bad' : ''}">${fmt(n)}</td>`).join('')}</tr>`).join('');
+    $('worst').innerHTML = `<tr><th>Station</th><th>Checks</th><th>Wrong</th><th>Busier than forecast</th></tr>` + F.worst.map(w => `<tr><td>${w.station} <span class="mute">${w.code}</span></td><td>${w.checks}</td><td>${w.miss_pct}%</td><td>${w.busier_than_forecast}</td></tr>`).join('');
+  }
+})();
+</script>
+</body>
+</html>
