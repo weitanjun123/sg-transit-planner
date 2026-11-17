@@ -1,0 +1,768 @@
+{
+"source": "https://data.gov.sg/datasets/d_a223380e5856cf06f7eac223e5902230/view",
+"records": [
+{
+"_id": 1,
+"financial_year": "2010",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "2249"
+},
+{
+"_id": 2,
+"financial_year": "2010",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "4198"
+},
+{
+"_id": 3,
+"financial_year": "2010",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "926"
+},
+{
+"_id": 4,
+"financial_year": "2010",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "59"
+},
+{
+"_id": 5,
+"financial_year": "2010",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "10307"
+},
+{
+"_id": 6,
+"financial_year": "2010",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "na"
+},
+{
+"_id": 7,
+"financial_year": "2011",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "1742"
+},
+{
+"_id": 8,
+"financial_year": "2011",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "4390"
+},
+{
+"_id": 9,
+"financial_year": "2011",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "1144"
+},
+{
+"_id": 10,
+"financial_year": "2011",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "125"
+},
+{
+"_id": 11,
+"financial_year": "2011",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "51"
+},
+{
+"_id": 12,
+"financial_year": "2011",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "13992"
+},
+{
+"_id": 13,
+"financial_year": "2011",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "498"
+},
+{
+"_id": 14,
+"financial_year": "2012",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "1122"
+},
+{
+"_id": 15,
+"financial_year": "2012",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "3393"
+},
+{
+"_id": 16,
+"financial_year": "2012",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "1668"
+},
+{
+"_id": 17,
+"financial_year": "2012",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "132"
+},
+{
+"_id": 18,
+"financial_year": "2012",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "33"
+},
+{
+"_id": 19,
+"financial_year": "2012",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "12131"
+},
+{
+"_id": 20,
+"financial_year": "2012",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "697"
+},
+{
+"_id": 21,
+"financial_year": "2013",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "788"
+},
+{
+"_id": 22,
+"financial_year": "2013",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "2611"
+},
+{
+"_id": 23,
+"financial_year": "2013",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "1504"
+},
+{
+"_id": 24,
+"financial_year": "2013",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "99"
+},
+{
+"_id": 25,
+"financial_year": "2013",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "44"
+},
+{
+"_id": 26,
+"financial_year": "2013",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "9295"
+},
+{
+"_id": 27,
+"financial_year": "2013",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "3380"
+},
+{
+"_id": 28,
+"financial_year": "2014",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "1070"
+},
+{
+"_id": 29,
+"financial_year": "2014",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "1890"
+},
+{
+"_id": 30,
+"financial_year": "2014",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "1855"
+},
+{
+"_id": 31,
+"financial_year": "2014",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "94"
+},
+{
+"_id": 32,
+"financial_year": "2014",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "50"
+},
+{
+"_id": 33,
+"financial_year": "2014",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "9766"
+},
+{
+"_id": 34,
+"financial_year": "2014",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "10213"
+},
+{
+"_id": 35,
+"financial_year": "2015",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "563"
+},
+{
+"_id": 36,
+"financial_year": "2015",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "3327"
+},
+{
+"_id": 37,
+"financial_year": "2015",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "2190"
+},
+{
+"_id": 38,
+"financial_year": "2015",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "37"
+},
+{
+"_id": 39,
+"financial_year": "2015",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "56"
+},
+{
+"_id": 40,
+"financial_year": "2015",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "7280"
+},
+{
+"_id": 41,
+"financial_year": "2015",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "6307"
+},
+{
+"_id": 42,
+"financial_year": "2015",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "2392"
+},
+{
+"_id": 43,
+"financial_year": "2016",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "-4"
+},
+{
+"_id": 44,
+"financial_year": "2016",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "5174"
+},
+{
+"_id": 45,
+"financial_year": "2016",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "2676"
+},
+{
+"_id": 46,
+"financial_year": "2016",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 47,
+"financial_year": "2016",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "57"
+},
+{
+"_id": 48,
+"financial_year": "2016",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "6240"
+},
+{
+"_id": 49,
+"financial_year": "2016",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "6020"
+},
+{
+"_id": 50,
+"financial_year": "2016",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "4691"
+},
+{
+"_id": 51,
+"financial_year": "2017",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "-2"
+},
+{
+"_id": 52,
+"financial_year": "2017",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "6400"
+},
+{
+"_id": 53,
+"financial_year": "2017",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "3450"
+},
+{
+"_id": 54,
+"financial_year": "2017",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 55,
+"financial_year": "2017",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "59"
+},
+{
+"_id": 56,
+"financial_year": "2017",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "7152"
+},
+{
+"_id": 57,
+"financial_year": "2017",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "4897"
+},
+{
+"_id": 58,
+"financial_year": "2017",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "5185"
+},
+{
+"_id": 59,
+"financial_year": "2018",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "0"
+},
+{
+"_id": 60,
+"financial_year": "2018",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "4931"
+},
+{
+"_id": 61,
+"financial_year": "2018",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "3699"
+},
+{
+"_id": 62,
+"financial_year": "2018",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 63,
+"financial_year": "2018",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "59"
+},
+{
+"_id": 64,
+"financial_year": "2018",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "6589"
+},
+{
+"_id": 65,
+"financial_year": "2018",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "4650"
+},
+{
+"_id": 66,
+"financial_year": "2018",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "9841"
+},
+{
+"_id": 67,
+"financial_year": "2019",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "0"
+},
+{
+"_id": 68,
+"financial_year": "2019",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "5805"
+},
+{
+"_id": 69,
+"financial_year": "2019",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "3798"
+},
+{
+"_id": 70,
+"financial_year": "2019",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 71,
+"financial_year": "2019",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "49"
+},
+{
+"_id": 72,
+"financial_year": "2019",
+"housing_grant_scheme": "Additional CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "11067"
+},
+{
+"_id": 73,
+"financial_year": "2019",
+"housing_grant_scheme": "Special CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "5977"
+},
+{
+"_id": 74,
+"financial_year": "2019",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "10000"
+},
+{
+"_id": 75,
+"financial_year": "2020",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "0"
+},
+{
+"_id": 76,
+"financial_year": "2020",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "6911"
+},
+{
+"_id": 77,
+"financial_year": "2020",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "3609"
+},
+{
+"_id": 78,
+"financial_year": "2020",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 79,
+"financial_year": "2020",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "52"
+},
+{
+"_id": 80,
+"financial_year": "2020",
+"housing_grant_scheme": "Additional CPF Housing Grant and Enhanced CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "13759"
+},
+{
+"_id": 81,
+"financial_year": "2020",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "11220"
+},
+{
+"_id": 82,
+"financial_year": "2021",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "0"
+},
+{
+"_id": 83,
+"financial_year": "2021",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "7826"
+},
+{
+"_id": 84,
+"financial_year": "2021",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "3673"
+},
+{
+"_id": 85,
+"financial_year": "2021",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 86,
+"financial_year": "2021",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "55"
+},
+{
+"_id": 87,
+"financial_year": "2021",
+"housing_grant_scheme": "Additional CPF Housing Grant and Enhanced CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "15541"
+},
+{
+"_id": 88,
+"financial_year": "2021",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "12701"
+},
+{
+"_id": 89,
+"financial_year": "2022",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "0"
+},
+{
+"_id": 90,
+"financial_year": "2022",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "6306"
+},
+{
+"_id": 91,
+"financial_year": "2022",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "3501"
+},
+{
+"_id": 92,
+"financial_year": "2022",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 93,
+"financial_year": "2022",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "51"
+},
+{
+"_id": 94,
+"financial_year": "2022",
+"housing_grant_scheme": "Additional CPF Housing Grant and Enhanced CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "16981"
+},
+{
+"_id": 95,
+"financial_year": "2022",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "10542"
+},
+{
+"_id": 96,
+"financial_year": "2023",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "0"
+},
+{
+"_id": 97,
+"financial_year": "2023",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "6979"
+},
+{
+"_id": 98,
+"financial_year": "2023",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "4196"
+},
+{
+"_id": 99,
+"financial_year": "2023",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 100,
+"financial_year": "2023",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "54"
+},
+{
+"_id": 101,
+"financial_year": "2023",
+"housing_grant_scheme": "Additional CPF Housing Grant and Enhanced CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "14038"
+},
+{
+"_id": 102,
+"financial_year": "2023",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "10487"
+},
+{
+"_id": 103,
+"financial_year": "2024",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant (living near parents/married child)",
+"no_of_hh": "0"
+},
+{
+"_id": 104,
+"financial_year": "2024",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Family Grant",
+"no_of_hh": "5927"
+},
+{
+"_id": 105,
+"financial_year": "2024",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant",
+"no_of_hh": "4358"
+},
+{
+"_id": 106,
+"financial_year": "2024",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Singles Grant (living with parents)",
+"no_of_hh": "0"
+},
+{
+"_id": 107,
+"financial_year": "2024",
+"housing_grant_scheme": "CPF Housing Grant",
+"type_of_grant": "Joint Singles Grant",
+"no_of_hh": "46"
+},
+{
+"_id": 108,
+"financial_year": "2024",
+"housing_grant_scheme": "Additional CPF Housing Grant and Enhanced CPF Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "15820"
+},
+{
+"_id": 109,
+"financial_year": "2024",
+"housing_grant_scheme": "Proximity Housing Grant",
+"type_of_grant": "na",
+"no_of_hh": "10399"
+}
+]
+}
