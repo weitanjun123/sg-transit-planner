@@ -67,7 +67,7 @@ const W = 420, H = 232, LON0 = 103.6, LON1 = 104.02, LAT0 = 1.475, LAT1 = 1.24;
 const ROUTES = { // MRT lines in the simulation (current network). cap = passengers per train (LTA rolling stock, approx.)
   NS:{cap:1920, cars:6, peak:2.2}, EW:{cap:1920, cars:6, peak:2.2}, CG:{cap:1920, cars:6, peak:5},
   NE:{cap:1920, cars:6, peak:2.5}, CC:{cap:930, cars:3, peak:2.5}, DT:{cap:930, cars:3, peak:2.5}, TE:{cap:1280, cars:4, peak:3}};
-const TRANSFER = 1.5;          // tap-ins undercount riders who change lines; rough uplift
+const TRANSFER = 1.5;          // tap-ins undercount riders who change lines; rough uplift (transfer-heavy stretches, e.g. from Jurong East, are still understated)
 const SPEED_KMH = 45, DWELL = 0.4;
 const px = lon => Math.round((lon - LON0) / (LON1 - LON0) * W), py = lat => Math.round((lat - LAT0) / (LAT1 - LAT0) * H);
 const hhmm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0'); };
@@ -78,7 +78,7 @@ function headway(h, weekend) {      // minutes between trains
   if (h < 7) return 3.5; if (h < 9) return 0; if (h < 17) return 4.5; if (h < 20) return 0; if (h < 23) return 5.5; return 7;
 }
 // ------------------------------------------------------------------ state
-let S, byCode = {}, routes = {}, demand = {}, trains = [], t = 480, playing = true, speed = 1, weekend = false, zoom = 1, you = null, srcNote = '';
+let FC = null, S, byCode = {}, routes = {}, demand = {}, trains = [], t = 480, playing = true, speed = 1, weekend = false, zoom = 1, you = null, srcNote = '';
 const cv = document.getElementById('map'), ctx = cv.getContext('2d'); cv.width = W; cv.height = H;
 const land = document.createElement('canvas'); land.width = W; land.height = H;
 
@@ -94,6 +94,7 @@ async function init() {
     let acc = 0; routes[k].tt = [0];
     for (let i = 1; i < stops.length; i++) { acc += dist(stops[i-1].s, stops[i].s) / SPEED_KMH * 60 + DWELL; routes[k].tt.push(acc); }
   }
+  try { const r = await fetch('data/crowd_forecast.json', {cache:'no-store'}); if (r.ok) FC = await r.json(); } catch (e) {}
   const real = await loadDemand();
   buildLoads();
   if (!real) {   // placeholder only: scale so the single worst AM-peak segment is ~110% full (typical of SG peak)
@@ -274,9 +275,15 @@ function renderTrip() {
     return `<div class="stop ${cls}"><span>${hhmm(tm)}</span><span>${n === 0 ? '★ ' : ''}${r.stops[i].s.name}</span>` +
       (ld == null ? '<span>exit</span>' : `<div class="bar"><i style="width:${Math.min(100, ld * 100 / 1.4)}%;background:${loadCol(ld)}"></i></div>`) + '</div>';
   }).join('') + `<div class="mute" style="margin-top:6px">${Math.round(you.arrive - you.board)} min on board · fullest stretch ≈ ${Math.round(maxL * 100)}% of capacity` +
-    (maxL > 1 ? ' — expect to stand, likely skip a train at Jurong East' : maxL > .8 ? ' — standing room only' : ' — good chance of a seat') + '</div>';
+    (maxL > .9 ? ' — packed, you may have to let a train go' : maxL > .6 ? ' — crowded, standing shoulder to shoulder' : maxL > .15 ? ' — seats taken, comfortable standing room' : ' — good chance of a seat') +
+    ' (100% = 1,920 people incl. standing; only ~15% are seats).' + platformNote() + '</div>';
 }
 
+function platformNote() {
+  if (!FC || !you) return '';
+  const slot = hhmm(Math.floor(you.board / 30) * 30), lv = (FC.stations[JE] || []).find(x => x[0] === slot);
+  return lv ? `<br>LTA platform crowd forecast, Jurong East ${slot} (${FC.date}): <b>${{l:'low', m:'moderate', h:'high'}[lv[1]] || lv[1]}</b>.` : '';
+}
 // ------------------------------------------------------------------ carriage view
 let modalTrain = null, sprites = [];
 function openTrain(tr) {
