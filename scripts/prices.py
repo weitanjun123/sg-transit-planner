@@ -151,7 +151,33 @@ def main():
                             "near_new_station_change_pct": round(100 * (ta / tb - 1), 1), "rest_of_town_change_pct": round(100 * (ca / cb - 1), 1),
                             "difference_pts": round(100 * ((ta / tb) - (ca / cb)), 1), "sales": [ntb, nta, ncb, nca],
                             "after_window_complete": after[1] <= last, "low_confidence": min(ntb, nta, ncb, nca) < 100})
-        out["hdb"] = {"latest_month": last, "sales_used": len(sales), "sales_unplaced": miss, "blocks": blocks,
+        # why towns differ: town median $psf vs distance to Raffles Place and flat age (least squares, 26 towns)
+        RP = (1.28393, 103.85143)
+        tw = defaultdict(lambda: {"psf": [], "year": [], "cbd": [], "near": [], "sqm": []})
+        for s in sales:
+            if s["month"] < m12:
+                continue
+            t = tw[s["town"]]; t["psf"].append(s["psf"]); t["year"].append(s["lease"]); t["cbd"].append(km((s["lat"], s["lon"]), RP))
+            t["near"].append(near_cache[s["k"]][0] < 0.4); t["sqm"].append(s["price"] / s["psf"] / SQM_TO_SQFT)
+        trows = [{"town": k, "psf": med(v["psf"]), "built": med(v["year"]), "km_cbd": med(v["cbd"]), "near_mrt_pct": 100 * sum(v["near"]) / len(v["near"]),
+                  "sqm": med(v["sqm"]), "sales": len(v["psf"])} for k, v in tw.items() if len(v["psf"]) >= 100]
+        X = [[1, r["km_cbd"], r["built"]] for r in trows]; y = [r["psf"] for r in trows]
+        n = 3; A = [[sum(x[i] * x[j] for x in X) for j in range(n)] for i in range(n)]; b = [sum(x[i] * yy for x, yy in zip(X, y)) for i in range(n)]
+        for i in range(n):
+            for j in range(i + 1, n):
+                f = A[j][i] / A[i][i]; A[j] = [a - f * c for a, c in zip(A[j], A[i])]; b[j] -= f * b[i]
+        coef = [0.0] * n
+        for i in reversed(range(n)):
+            coef[i] = (b[i] - sum(A[i][j] * coef[j] for j in range(i + 1, n))) / A[i][i]
+        ym = sum(y) / len(y); ssr = 0.0
+        for r, x in zip(trows, X):
+            r["predicted"] = sum(a * c for a, c in zip(x, coef)); ssr += (r["psf"] - r["predicted"]) ** 2
+        r2 = 1 - ssr / sum((v - ym) ** 2 for v in y)
+        why = {"per_km_from_cbd": round(coef[1], 1), "per_year_newer": round(coef[2], 1), "r2": round(r2, 2),
+               "towns": [{"town": r["town"], "psf": round(r["psf"]), "predicted": round(r["predicted"]), "gap": round(r["psf"] - r["predicted"]),
+                          "built": round(r["built"]), "km_cbd": round(r["km_cbd"], 1), "near_mrt_pct": round(r["near_mrt_pct"]), "sqm": round(r["sqm"]), "sales": r["sales"]}
+                         for r in sorted(trows, key=lambda r: -r["psf"])]}
+        out["hdb"] = {"town_why": why, "latest_month": last, "sales_used": len(sales), "sales_unplaced": miss, "blocks": blocks,
                       "towns_monthly": towns_monthly, "town_median_psf_12m": {t: round(v) for t, v in sorted(town12.items(), key=lambda kv: -kv[1])},
                       "mrt_premium": premium, "new_station_effect": effects}
         print(f"HDB: {len(sales)} sales placed ({miss} not matched), {len(blocks)} blocks, latest {last}")

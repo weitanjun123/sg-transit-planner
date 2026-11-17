@@ -48,6 +48,10 @@
   <h2>Homes the proposed lines would put near a station</h2>
   <div class="card"><table id="lines"></table><div class="mute" style="margin-top:6px">HDB blocks (and private projects, once URA data is in) within ~800 m of each proposed new station, last 12 months of sales.</div></div>
 
+  <h2>Why are some towns more expensive?</h2>
+  <p class="lead" id="whyLead"></p>
+  <div class="card"><table id="why"></table><div class="mute" style="margin-top:6px">"Expected" = what the town's distance to Raffles Place and typical flat age predict. The gap is everything else: views, estate, flat size, scarcity, schools, amenities. Big flats cost less per sq ft, so towns with large flats look cheaper on $psf.</div></div>
+
   <h2>Most and least expensive HDB towns (last 12 months)</h2>
   <div class="card" id="towns"></div>
   <p class="mute">Sources: HDB resale flat prices from Jan 2017 (data.gov.sg), placed by block and street. Private: URA Data Service residential transactions. $psf = price ÷ floor area. Straight-line distances. These are associations, not proof that the MRT caused a price change; flat age, size, floor and estate also matter. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/prices.py">scripts/prices.py</a>.</p>
@@ -95,6 +99,12 @@ function townChart() {
   sel.onchange = e => { state.town = e.target.value; townChart(); };
   const seg = $('cmp'), paint = () => [...seg.children].forEach(b => b.classList.toggle('on', b.dataset.v === state.cmp));
   seg.onclick = e => { if (!e.target.dataset.v) return; state.cmp = e.target.dataset.v; paint(); townChart(); }; paint(); townChart();
+  const Y = H.town_why;
+  if (Y) {
+    $('whyLead').innerHTML = `Two things explain about <b>${Math.round(Y.r2 * 100)}%</b> of the difference between towns: <b>distance to the CBD</b> (each extra km from Raffles Place ≈ <b>$${Math.abs(Y.per_km_from_cbd)} psf less</b>) and <b>how new the flats are</b> (each year newer ≈ <b>$${Y.per_year_newer} psf more</b>, since more lease is left).`;
+    $('why').innerHTML = '<tr><th>Town</th><th>Actual</th><th>Expected</th><th>Gap</th><th>km to CBD</th><th>Built</th><th>≤400 m MRT</th><th>Size</th></tr>' + Y.towns.map(t =>
+      `<tr><td>${t.town}</td><td>$${fmt(t.psf)}</td><td>$${fmt(t.predicted)}</td><td><span class="${t.gap >= 0 ? 'up' : 'down'}">${t.gap >= 0 ? '+' : '−'}$${Math.abs(t.gap)}</span></td><td>${t.km_cbd}</td><td>~${t.built}</td><td>${t.near_mrt_pct}%</td><td>${t.sqm} sqm</td></tr>`).join('');
+  }
   const tt = Object.entries(H.town_median_psf_12m), tmax = tt[0][1];
   $('towns').innerHTML = tt.map(([t, v]) => `<div class="row"><span>${t}</span><div class="bar"><i style="width:${v / tmax * 100}%;background:var(--gold)"></i></div><span class="num">$${fmt(v)}</span></div>`).join('');
   $('lines').innerHTML = '<tr><th>Line</th><th>HDB blocks</th><th>HDB $psf</th><th>Private projects</th><th>Private $psf</th></tr>' +
