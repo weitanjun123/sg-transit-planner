@@ -13,7 +13,8 @@ Method (all parameters in PARAMS, printed into the output so anyone can reproduc
  1. residents = dwelling units x average household size, on a 300 m grid
  2. a cell is "served" if an MRT station is within ~800 m straight line of its centre (about a 10-minute walk
     to the nearest station entrance; entrances sit up to ~200 m from the station centre point)
- 3. unserved residents are weighted up when their current nearest station is crowded in the AM peak, and again
+ 3. unserved residents are weighted up when their current nearest station is crowded in the AM peak (its own tap-ins,
+    the load on the busiest track next to it, or line changes there - from routed LTA trips), and again
     when many people there take a morning bus just to reach an MRT station (LTA bus origin-destination data)
  4. greedy siting: repeatedly place a new station where it would serve the most weighted unserved residents,
     at least 1 km from any existing/planned station, until a station would serve too few people
@@ -103,6 +104,15 @@ def crowd_index(stations, now_year):
             if am and code in code_to_sid:
                 share = sum(1 for l in am if l == "h") / len(am) + 0.5 * sum(1 for l in am if l == "m") / len(am)
                 idx[code_to_sid[code]] = max(idx[code_to_sid[code]], share)
+    # routed trips (scripts/insights.py): how full the busiest track next to each station is at 7-9am, and line changes there
+    ins = load("insights.json")
+    if ins and ins.get("per_station"):
+        ps = ins["per_station"]
+        top_load = max((v["am_track_load"] for v in ps.values()), default=0) or 1
+        top_x = max((v["transfers_am"] for v in ps.values()), default=0) or 1
+        for sid, v in ps.items():
+            sid = int(sid)
+            idx[sid] = max(idx[sid], v["am_track_load"] / top_load, v["transfers_am"] / top_x)
     return idx, bool(hourly), bool(fc)
 
 
@@ -166,7 +176,7 @@ def main():
         w = pop * lrt * (1 + P["crowd_weight"] * crowd.get(mrt_now[jn]["id"], 0)) * (1 + P["bus_feeder_weight"] * min(1.0, fb / 2000))
         weight[k] = (w, pop, mrt_now[jn]["id"])
         lat, lon = ll(x, y)
-        gaps.append([lat, lon, round(pop), round(w), round(dn)])
+        gaps.append([lat, lon, round(pop), round(w), round(dn), mrt_now[jn]["id"]])
 
     # ---- 4. greedy station siting ----------------------------------------------------------
     cand = [k for k in keys if k in weight]
@@ -310,14 +320,22 @@ def main():
                       "relieves": [{"station": k, "residents": round(v)} for k, v in sorted(relieved.items(), key=lambda kv: -kv[1])[:4]],
                       "why": ""})
     lines.sort(key=lambda l: -l["new_residents"])
+    ins_ps = (load("insights.json", {}) or {}).get("per_station", {})
     for i, l in enumerate(lines):
         l["name"] = f"Proposed Line {chr(65 + i)}"
         areas = ", ".join(p["name"][5:] for p in l["stations"] if p.get("site"))
         ic = " and ".join(p["name"] for p in l["stations"] if p.get("interchange"))
         rl = ", ".join(r["station"] for r in l["relieves"][:2])
+        pressure = None
+        if ins_ps and l["relieves"]:
+            nm2sid = {st_["name"]: st_["id"] for st_ in stations}
+            cands = [(r["station"], ins_ps.get(str(nm2sid.get(r["station"])), {}).get("am_track_load", 0)) for r in l["relieves"][:2]]
+            best = max(cands, key=lambda c: c[1])
+            pressure = best if best[1] > 0 else None
         l["why"] = (f"{l['new_stations']} new station(s) serving {l['new_residents']:,} residents who are more than a 10-minute walk "
                     f"from any existing or planned MRT station ({areas}). Interchanges at {ic or 'n/a'}."
-                    + (f" Takes pressure off {rl}." if rl else ""))
+                    + (f" Takes pressure off {rl}." if rl else "")
+                    + (f" The busiest track next to {pressure[0]} carries ~{pressure[1]:,} people at 7-9am." if pressure else ""))
 
     out = {
         "generated": dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).isoformat(timespec="minutes"),

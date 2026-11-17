@@ -43,6 +43,18 @@
   <label class="tg"><input type="checkbox" id="lyFuture" checked> New BTO &amp; land-sale sites</label>
   <label class="tg"><input type="checkbox" id="lyCrowd" checked> Today's AM-peak crowd (LTA)</label>
   <label class="tg"><input type="checkbox" id="lyBus" checked> People bussing to the MRT each morning</label>
+  <label class="tg"><input type="checkbox" id="lyTrack"> Busiest track, 7–9am</label>
+  <label class="tg"><input type="checkbox" id="lyGapMin"> Shade gaps by morning minutes on the train</label>
+  <h2>Colour stations by</h2>
+  <select id="colorBy" style="width:100%;background:#252932;color:#e9ecf1;border:1px solid #3a404c;border-radius:8px;padding:7px">
+    <option value="line">MRT line</option><option value="transfers">Line changes a day (hidden load)</option><option value="minutes">Morning minutes on the train</option>
+    <option value="type">Station personality</option><option value="weekend">Weekend vs weekday</option><option value="back">Riders coming back by MRT</option>
+  </select>
+  <div id="legend" class="mute" style="margin-top:6px"></div>
+  <h2>24-hour heartbeat</h2>
+  <button id="hbPlay" style="background:#f2c14e;color:#111;border:0;border-radius:8px;padding:7px 12px;font-weight:600;cursor:pointer">▶ Play the day on the map</button>
+  <span id="hbClock" style="font:700 20px system-ui;color:#f2c14e;margin-left:10px"></span>
+  <div class="mute" id="hbInfo"></div>
   <h2>Summary</h2>
   <div class="stats" id="stats"></div>
   <h2>Proposed lines</h2>
@@ -55,6 +67,7 @@
   <div class="mute" id="method"></div>
 </div>
 <div id="map"></div>
+<canvas id="hb" style="position:absolute;pointer-events:none;z-index:450"></canvas>
 <script>
 const fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
 const get = p => fetch(p, {cache:'no-store'}).then(r => r.ok ? r.json() : null).catch(() => null);
@@ -72,7 +85,7 @@ L.control.layers(BASE, null, {position:'topright'}).addTo(map);
 map.on('baselayerchange', e => { try { localStorage.setItem('sgtp_base', e.name); } catch (err) {} });
 map.setMinZoom(11); map.setMaxBounds([[1.144, 103.535], [1.494, 104.502]]);
 const G = { net:L.layerGroup().addTo(map), gaps:L.layerGroup().addTo(map), prop:L.layerGroup().addTo(map),
-            fut:L.layerGroup().addTo(map), crowd:L.layerGroup().addTo(map), bus:L.layerGroup().addTo(map) };
+            fut:L.layerGroup().addTo(map), crowd:L.layerGroup().addTo(map), bus:L.layerGroup().addTo(map), track:L.layerGroup().addTo(map) };
 const YEARS = [[2026.9,'Today'],[2027,'2027'],[2028.6,'2028'],[2030,'2030'],[2032,'2032'],[2040,'2040']];
 let ST, AN, FC, INS, year = 2026.9;
 function drawBus() {
@@ -94,15 +107,82 @@ function drawNetwork() {
   }
   for (const c of ST.corridors) if (c.path.length) L.polyline(c.path, {color:'#8b93a1', weight:3, dashArray:'2 8'})
     .bindPopup(`<b>${c.name}</b><br>${c.status}<br><a href="${c.source}" target="_blank">source</a>`).addTo(G.net);
+  const by = document.getElementById('colorBy').value, PS = INS?.per_station || {};
   for (const s of ST.stations) {
     if (s.open_year > year) continue;
-    const future = s.open_year > 2026.9;
-    const col = ST.lines[(s.codes[0].code.match(/^[A-Z]+/)||[''])[0]]?.color || '#fff';
-    L.circleMarker([s.lat,s.lon], {radius: s.mode==='LRT'?2.5:4, color: future ? col : '#fff', weight:2,
+    const future = s.open_year > 2026.9, v = PS[s.id];
+    let col = ST.lines[(s.codes[0].code.match(/^[A-Z]+/)||[''])[0]]?.color || '#fff', r = s.mode==='LRT'?2.5:4, edge = future ? col : '#fff';
+    if (by !== 'line' && !future) { const c = stationStyle(by, v); if (c) { col = c.col; r = c.r; edge = '#14161a'; } else { col = '#3a404c'; r = 3; } }
+    L.circleMarker([s.lat,s.lon], {radius:r, color:edge, weight: by === 'line' ? 2 : 1,
       fillColor: future ? '#14161a' : col, fillOpacity:1})
       .bindPopup(`<b>${s.name}</b><br>` + s.codes.map(c => `${c.code} · ${c.opening === 'open' ? 'open' : c.opening}`).join('<br>')
+        + (v ? `<hr style="border-color:#333">Tap-ins: ${fmt(v.taps_in)}/weekday<br>Line changes: ${fmt(v.transfers)}/day (${fmt(v.transfers_am)} at 7–9am)<br>Busiest track next to it, 7–9am: ${fmt(v.am_track_load)}<br>Morning minutes on the train: ${v.minutes ?? '–'}<br>Type: ${v.type || '–'}<br>Weekend vs weekday: ${v.weekend_ratio != null ? Math.round(v.weekend_ratio * 100) + '%' : '–'}<br>Morning riders back by MRT: ${v.back_pct != null ? v.back_pct + '%' : '–'}` : '')
         + `<br><span class="mute">coords: ${s.coord_source}</span>`).addTo(G.net);
   }
+  legend(by);
+}
+
+const TYPE_COL = {'Classic home towns':'#3fbf7f', 'Early-shift home towns':'#f2c14e', 'Mixed town centres':'#9be37a', 'Work, school & hospital destinations':'#5aa9ff',
+  'CBD & business parks':'#b478ff', 'Shopping & night-out hubs':'#ff4fd8', 'Weekend & event magnets':'#ff8c42'};
+const ramp = (t, a, b) => { t = Math.max(0, Math.min(1, t)); const h = x => parseInt(x, 16), A = [h(a.slice(1,3)), h(a.slice(3,5)), h(a.slice(5,7))], B = [h(b.slice(1,3)), h(b.slice(3,5)), h(b.slice(5,7))];
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`; };
+function stationStyle(by, v) {
+  if (!v) return null;
+  if (by === 'transfers') return v.transfers ? {col:ramp(v.transfers / 150000, '#f2c14e', '#e5484d'), r:3 + Math.sqrt(v.transfers) / 40} : null;
+  if (by === 'minutes') return v.minutes ? {col:ramp((v.minutes - 15) / 20, '#3fbf7f', '#e5484d'), r:5} : null;
+  if (by === 'type') return v.type ? {col:TYPE_COL[v.type] || '#ccc', r:5} : null;
+  if (by === 'weekend') return v.weekend_ratio != null ? {col: v.weekend_ratio >= 1 ? ramp((v.weekend_ratio - 1) / 1.2, '#cccccc', '#ff8c42') : ramp((1 - v.weekend_ratio) / .8, '#cccccc', '#5aa9ff'), r:5} : null;
+  if (by === 'back') return v.back_pct != null ? {col:ramp((100 - v.back_pct) / 25, '#cccccc', '#e5484d'), r:5} : null;
+  return null;
+}
+function legend(by) {
+  const sw = c => `<i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c};margin:0 4px 0 8px;vertical-align:middle"></i>`;
+  const L_ = {line:'Official line colours. Hollow dots = future stations.',
+    transfers: `${sw('#f2c14e')}few ${sw('#e5484d')}150k+ line changes a day · bigger = more. Estimated by routing every LTA trip.`,
+    minutes: `${sw('#3fbf7f')}~15 min ${sw('#e5484d')}35+ min on the train for morning trips starting here.`,
+    type: Object.entries(TYPE_COL).map(([k, c]) => sw(c) + k).join('<br>'),
+    weekend: `${sw('#5aa9ff')}quieter on weekends ${sw('#cccccc')}same ${sw('#ff8c42')}busier on weekends`,
+    back: `${sw('#cccccc')}almost all come back by MRT ${sw('#e5484d')}many don't (75% or less)`};
+  document.getElementById('legend').innerHTML = (L_[by] || '') + (by !== 'line' ? '<br>Grey = no data. Future stations keep line colours.' : '');
+}
+function drawTrack() {
+  G.track.clearLayers();
+  if (!INS?.segments_am || !document.getElementById('lyTrack').checked) return;
+  const byId = Object.fromEntries(ST.stations.map(s => [s.id, s])), max = INS.segments_am[0][3];
+  for (const [a, b, line, v] of INS.segments_am) { if (v < max * 0.25) continue; const A = byId[a], B = byId[b];
+    L.polyline([[A.lat, A.lon], [B.lat, B.lon]], {color: ramp(v / max, '#f2c14e', '#e5484d'), weight: 2 + 12 * v / max, opacity: .85})
+      .bindPopup(`<b>${A.name} – ${B.name}</b> (${ST.lines[line]?.name || line})<br>~${fmt(v)} people on the busier direction at 7–9am (weekday)`).addTo(G.track); }
+}
+// ---- 24-hour heartbeat over the real map
+let HB = null, hbOn = false, hbT = 0, hbParts = [], hbLast = 0, hbAcc = 0;
+const HB_HOURS = [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0], HB_SEC = 3;
+function hbSize() { const c = document.getElementById('hb'), m = document.getElementById('map'), r = m.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
+  c.style.left = m.offsetLeft + 'px'; c.style.top = m.offsetTop + 'px'; c.style.width = r.width + 'px'; c.style.height = r.height + 'px';
+  c.width = r.width * d; c.height = r.height * d; c.getContext('2d').setTransform(d, 0, 0, d, 0, 0); }
+function hbColor(h) { return h >= 5 && h < 10 ? '242,193,78' : h < 16 ? '240,240,240' : h < 20 ? '90,169,255' : '178,120,255'; }
+function hbFrame(now) {
+  if (!hbOn) return;
+  const dt = Math.min(.05, (now - hbLast) / 1000 || 0); hbLast = now; hbT += dt / HB_SEC;
+  if (hbT >= HB_HOURS.length) { hbT = 0; hbParts = []; }
+  const h = HB_HOURS[Math.floor(hbT)], hr = HB.hours[h], total = hr.flows.reduce((a, f) => a + f[2], 0);
+  hbAcc += total / 60 / HB_SEC * dt;
+  while (hbAcc >= 1) { hbAcc -= 1; let x = Math.random() * total, f = hr.flows[0]; for (const q of hr.flows) { x -= q[2]; if (x <= 0) { f = q; break; } }
+    const a = HB.stations[f[0]], b = HB.stations[f[1]]; if (a && b) hbParts.push({a:[a[1], a[2]], b:[b[1], b[2]], p:0, v:.5 + Math.random() * .3, c:hbColor(h)}); }
+  const c = document.getElementById('hb'), g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'lighter';
+  for (const q of hbParts) { q.p += q.v * dt; const lat = q.a[0] + (q.b[0] - q.a[0]) * q.p, lon = q.a[1] + (q.b[1] - q.a[1]) * q.p, pt = map.latLngToContainerPoint([lat, lon]);
+    g.fillStyle = `rgba(${q.c},${.7 * Math.sin(Math.PI * Math.min(1, q.p))})`; g.fillRect(pt.x - 1.5, pt.y - 1.5, 3, 3); }
+  g.globalCompositeOperation = 'source-over'; hbParts = hbParts.filter(q => q.p < 1);
+  const mins = Math.floor((hbT % 1) * 60);
+  document.getElementById('hbClock').textContent = `${String(h).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  document.getElementById('hbInfo').textContent = `${fmt(hr.total)} train trips start this hour · top: ${HB.stations[hr.flows[0][0]][0]} → ${HB.stations[hr.flows[0][1]][0]} · one dot ≈ 60 trips`;
+  requestAnimationFrame(hbFrame);
+}
+async function hbToggle() {
+  const btn = document.getElementById('hbPlay');
+  if (!HB) { btn.textContent = 'Loading…'; HB = await get('data/heartbeat.json'); if (!HB) { btn.textContent = 'Heartbeat data missing'; return; } }
+  hbOn = !hbOn; btn.textContent = hbOn ? '❚❚ Pause' : '▶ Play the day on the map';
+  if (hbOn) { hbSize(); hbLast = performance.now(); requestAnimationFrame(hbFrame); }
 }
 
 function drawCrowd() {
@@ -121,9 +201,10 @@ function drawCrowd() {
 function drawAnalysis() {
   G.gaps.clearLayers(); G.prop.clearLayers(); G.fut.clearLayers();
   if (document.getElementById('lyGaps').checked)
-    for (const [lat, lon, pop, w, d] of AN.gaps.slice(0, 4000)) if (pop > 100)
-      L.circle([lat, lon], {radius: 150, stroke:false, fillColor:'#e5484d', fillOpacity: Math.min(.75, .12 + pop/6000)})
-        .bindPopup(`~${fmt(pop)} residents<br>nearest MRT today: ${fmt(d)} m (straight line)`).addTo(G.gaps);
+    for (const [lat, lon, pop, w, d, sid] of AN.gaps.slice(0, 4000)) if (pop > 100) {
+      const mins = INS?.per_station?.[sid]?.minutes, byMin = document.getElementById('lyGapMin').checked && mins;
+      L.circle([lat, lon], {radius: 150, stroke:false, fillColor: byMin ? ramp((mins - 15) / 20, '#3fbf7f', '#e5484d') : '#e5484d', fillOpacity: Math.min(.75, .12 + pop/6000)})
+        .bindPopup(`~${fmt(pop)} residents<br>nearest MRT today: ${fmt(d)} m (straight line)` + (mins ? `<br>morning trips from ${ST.stations.find(x => x.id === sid)?.name}: ~${mins} min on the train` : '')).addTo(G.gaps); }
   if (document.getElementById('lyProp').checked) {
     AN.lines.forEach((l, i) => {
       const pts = l.stations.map(p => [p.lat, p.lon]);
@@ -169,6 +250,11 @@ function panel() {
     b.onclick = () => { year = y; [...yb.children].forEach(c => c.className = ''); b.className = 'on'; drawNetwork(); }; yb.appendChild(b); });
   drawNetwork(); drawCrowd(); drawBus(); if (AN) { drawAnalysis(); panel(); }
   document.getElementById('lyBus').onchange = drawBus;
+  document.getElementById('lyTrack').onchange = drawTrack; document.getElementById('lyGapMin').onchange = drawAnalysis;
+  try { document.getElementById('colorBy').value = localStorage.getItem('sgtp_colorBy') || 'line'; } catch (e) {}
+  document.getElementById('colorBy').onchange = e => { try { localStorage.setItem('sgtp_colorBy', e.target.value); } catch (err) {} drawNetwork(); };
+  document.getElementById('hbPlay').onclick = hbToggle; addEventListener('resize', () => hbOn && hbSize());
+  drawNetwork(); drawTrack();
   ['lyGaps','lyProp','lyFuture'].forEach(id => document.getElementById(id).onchange = drawAnalysis);
   document.getElementById('lyCrowd').onchange = drawCrowd;
 })();

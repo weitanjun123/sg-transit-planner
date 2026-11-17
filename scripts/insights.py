@@ -362,6 +362,32 @@ def main():
            "personalities": pers, "weekend": {"magnets": wk_rows[:20], "commuter_only": wk_rows[-15:][::-1]},
            "mismatch": {"stations": mm_rows[:20], "best_return": mm_rows[-10:][::-1], "pairs": pair_rows},
            "bus": bus}
+    # ---------------------------------------------------------------- per-station + per-segment values for the map
+    stype = {x: t["type"] for t in pers for x in []}
+    for t in pers:
+        for nm_ in t["stations"]:
+            stype[nm_] = t["type"]
+    back = {o: 100 * st_back[o] / v for o, v in st_am.items() if v >= 500}
+    seg_am = defaultdict(float)
+    for k, arr in seg["weekday"].items():
+        a, b = k.split(">"); ia, ib = code2sid[a], code2sid[b]
+        key = (min(ia, ib), max(ia, ib), re.match(r"[A-Z]+", a).group(0))
+        seg_am[key] = max(seg_am[key], arr[7] + arr[8])        # busier direction, 7-9am
+    near_load = defaultdict(float)
+    for (ia, ib, _), v in seg_am.items():
+        near_load[ia] = max(near_load[ia], v); near_load[ib] = max(near_load[ib], v)
+    per = {}
+    for sid in open_now:
+        taps = sum(tap[sid]["weekday"][0]) if sid in tap else 0
+        wd = taps + (sum(tap[sid]["weekday"][1]) if sid in tap else 0)
+        we = (sum(tap[sid]["weekend"][0]) + sum(tap[sid]["weekend"][1])) if sid in tap else 0
+        m, n = minutes.get(sid, (0, 0))
+        per[sid] = {"taps_in": round(taps), "transfers": round(transfers.get(sid, 0)), "transfers_am": round(transfers_am.get(sid, 0)),
+                    "minutes": round(m / n, 1) if n >= 300 else None, "type": stype.get(name(sid)),
+                    "weekend_ratio": round(we / wd, 2) if wd >= 2000 else None, "back_pct": round(back[sid], 1) if sid in back else None,
+                    "am_track_load": round(near_load.get(sid, 0))}
+    out["per_station"] = per
+    out["segments_am"] = [[ia, ib, l, round(v)] for (ia, ib, l), v in sorted(seg_am.items(), key=lambda kv: -kv[1])]
     json.dump(out, open("docs/data/insights.json", "w"), separators=(",", ":"))
     print(f"insights.json: {len(tr_rows)} interchanges, {len(pers)} station types, bus={'yes' if bus['available'] else 'no'}; months {months}")
 
