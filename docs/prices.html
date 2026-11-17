@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner — Home prices &amp; the MRT</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --blue:#5aa9ff; --red:#e5484d; --green:#3fbf7f; --line:#2b3038; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:920px; margin:0 auto; padding:18px 14px 70px; }
+  h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:18px; margin:30px 0 4px; } h3 { font-size:14px; margin:8px 0 6px; }
+  a { color:var(--gold); } .mute { color:var(--mute); font-size:13px; } .lead { color:#cfd5de; margin:4px 0 10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px; }
+  .row { display:grid; grid-template-columns:1fr 1.2fr 80px; gap:8px; align-items:center; padding:5px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .bar { height:9px; background:#252932; border-radius:5px; overflow:hidden; } .bar i { display:block; height:100%; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { padding:6px 4px; border-bottom:1px solid var(--line); text-align:right; }
+  td:first-child, th:first-child { text-align:left; } th { color:var(--mute); font-weight:500; }
+  select { background:#252932; color:var(--ink); border:1px solid #3a404c; border-radius:8px; padding:6px 8px; font:inherit; }
+  .seg { display:inline-flex; border:1px solid #3a404c; border-radius:8px; overflow:hidden; } .seg button { background:#252932; color:var(--ink); border:0; padding:6px 10px; font:inherit; font-size:13px; cursor:pointer; } .seg button.on { background:var(--gold); color:#111; font-weight:600; }
+  .big { font-size:24px; font-weight:700; } .up { color:var(--green); } .down { color:var(--red); }
+  svg text { fill:var(--mute); font-size:20px; }
+  .note { background:#3a2f12; color:#f6dfa0; padding:8px 10px; border-radius:8px; font-size:13px; }
+</style>
+</head>
+<body><main>
+  <h1>Home prices &amp; the MRT</h1>
+  <div class="mute"><a href="./">home</a> · <a href="map.html">gap map</a> (price layers) · <a href="compare.html">ridership compare</a> · <a href="insights.html">deep dive</a></div>
+  <p class="mute" id="meta"></p>
+  <div id="privNote"></div>
+
+  <h2>Does being near an MRT station cost more?</h2>
+  <p class="lead">HDB resale $ per sq ft over the last 24 months, compared with the median of the same town, by straight-line distance to the nearest MRT station.</p>
+  <div class="card" id="premium"></div>
+
+  <h2>What happened when a new station opened?</h2>
+  <p class="lead">Blocks whose nearest MRT went from more than 800 m to under 600 m when a line opened, against other blocks more than 800 m from any station in the same towns: price change from the 2 years before opening to the 2 years after (each sale measured against its town's median that month).</p>
+  <div class="grid" id="effects"></div>
+
+  <h2>Prices by town, month on month and year on year</h2>
+  <div class="card">
+    <select id="town"></select> <span class="seg" id="cmp"><button data-v="1">Month on month</button><button data-v="12">Year on year</button></span>
+    <div id="kpi" style="margin:10px 0"></div><div id="chart"></div>
+  </div>
+
+  <h2>Homes the proposed lines would put near a station</h2>
+  <div class="card"><table id="lines"></table><div class="mute" style="margin-top:6px">HDB blocks (and private projects, once URA data is in) within ~800 m of each proposed new station, last 12 months of sales.</div></div>
+
+  <h2>Most and least expensive HDB towns (last 12 months)</h2>
+  <div class="card" id="towns"></div>
+  <p class="mute">Sources: HDB resale flat prices from Jan 2017 (data.gov.sg), placed by block and street. Private: URA Data Service residential transactions. $psf = price ÷ floor area. Straight-line distances. These are associations, not proof that the MRT caused a price change; flat age, size, floor and estate also matter. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/prices.py">scripts/prices.py</a>.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id), fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], ml = m => `${MON[+m.slice(5) - 1]} ${m.slice(0, 4)}`;
+const pc = v => v == null ? '–' : `<span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${v}%</span>`;
+const shift = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5) - 1 + k, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+let P, state = {town:'All HDB', cmp:'12'};
+try { Object.assign(state, JSON.parse(localStorage.getItem('sgtp_prices') || '{}')); } catch (e) {}
+function townChart() {
+  const tm = P.hdb.towns_monthly[state.town] || {}, ms = Object.keys(tm).sort(), last = ms[ms.length - 1], prev = shift(last, -+state.cmp);
+  const a = tm[last], b = tm[prev], ch = b ? Math.round(1000 * (a - b) / b) / 10 : null;
+  $('kpi').innerHTML = `<span class="big">$${fmt(a)}</span> psf in ${ml(last)} · ${ml(prev)}: $${fmt(b)} · change ${pc(ch)}`;
+  const W = 900, H = 300, L = 70, B = 34, T = 10, v = ms.map(m => tm[m]), mn = Math.min(...v) * .95, mx = Math.max(...v) * 1.03;
+  const X = i => L + (W - L - 10) * i / (ms.length - 1), Y = x => T + (H - T - B) * (1 - (x - mn) / (mx - mn));
+  let g = ''; for (let k = 0; k <= 4; k++) { const x = mn + (mx - mn) * k / 4; g += `<line x1="${L}" x2="${W - 10}" y1="${Y(x)}" y2="${Y(x)}" stroke="#2b3038"/><text x="${L - 8}" y="${Y(x) + 6}" text-anchor="end">$${Math.round(x)}</text>`; }
+  ms.forEach((m, i) => { if (m.endsWith('-01')) g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle">${m.slice(0, 4)}</text>`; });
+  g += `<polyline fill="none" stroke="#f2c14e" stroke-width="3" points="${v.map((x, i) => `${X(i)},${Y(x)}`).join(' ')}"/>`;
+  const ib = ms.indexOf(prev); if (ib >= 0) g += `<circle cx="${X(ib)}" cy="${Y(b)}" r="7" fill="#5aa9ff"/>`;
+  g += `<circle cx="${X(ms.length - 1)}" cy="${Y(a)}" r="7" fill="#f2c14e"/>`;
+  $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%">${g}</svg><div class="mute">Median HDB resale $ per sq ft per month, ${state.town}</div>`;
+  try { localStorage.setItem('sgtp_prices', JSON.stringify(state)); } catch (e) {}
+}
+(async () => {
+  P = await (await fetch('data/prices.json', {cache:'no-store'})).json();
+  if (!P.hdb) { $('meta').textContent = 'Price data is still loading; the data bot fills this in on its next run.'; return; }
+  const H = P.hdb;
+  $('meta').textContent = `${fmt(H.sales_used)} HDB resale sales placed on the map (to ${ml(H.latest_month)}); updated ${P.generated.slice(0, 10)}.`;
+  $('privNote').innerHTML = P.private ? `<div class="mute">Private homes: ${fmt(P.private.transactions)} URA transactions to ${ml(P.private.latest_month)}.</div>` : '<div class="note">Condos, ECs and landed homes appear once the free URA key is added as the URA_ACCESS_KEY repo secret.</div>';
+  // premium
+  const pr = H.mrt_premium, mx = Math.max(...pr.map(r => Math.abs(r.relative_to_town_pct || 0))) || 1;
+  $('premium').innerHTML = pr.map(r => `<div class="row"><span>${r.band_m} m<br><span class="mute">${fmt(r.sales)} sales · median $${fmt(r.median_psf)} psf</span></span>
+    <div class="bar"><i style="width:${Math.abs(r.relative_to_town_pct || 0) / mx * 100}%;background:${(r.relative_to_town_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)'}"></i></div><span class="num">${pc(r.relative_to_town_pct)}</span></div>`).join('') +
+    '<div class="mute" style="margin-top:6px">% above or below the median $psf of the same town over the last 12 months.</div>';
+  // effects
+  $('effects').innerHTML = H.new_station_effect.map(e => `<div class="card"><h3>${e.opening} <span class="mute">(opened ${ml(e.opened)})</span></h3>
+    <div>${e.blocks_gaining_station} blocks gained a station · ${e.towns.join(', ')}</div>
+    <div style="margin-top:6px">Near the new station: ${pc(e.near_new_station_change_pct)} · rest of town: ${pc(e.rest_of_town_change_pct)}</div>
+    <div class="big" style="margin-top:4px">${e.difference_pts >= 0 ? '+' : ''}${e.difference_pts} pts</div><div class="mute">relative to the rest of the town${e.after_window_complete ? '' : ' · the 2 years after opening are not complete yet'} · sales ${e.sales.join(' / ')}</div></div>`).join('') || '<div class="mute">Not enough sales yet.</div>';
+  // towns
+  const sel = $('town'); sel.innerHTML = ['All HDB', ...Object.keys(H.town_median_psf_12m)].map(t => `<option ${t === state.town ? 'selected' : ''}>${t}</option>`).join('');
+  sel.onchange = e => { state.town = e.target.value; townChart(); };
+  const seg = $('cmp'), paint = () => [...seg.children].forEach(b => b.classList.toggle('on', b.dataset.v === state.cmp));
+  seg.onclick = e => { if (!e.target.dataset.v) return; state.cmp = e.target.dataset.v; paint(); townChart(); }; paint(); townChart();
+  const tt = Object.entries(H.town_median_psf_12m), tmax = tt[0][1];
+  $('towns').innerHTML = tt.map(([t, v]) => `<div class="row"><span>${t}</span><div class="bar"><i style="width:${v / tmax * 100}%;background:var(--gold)"></i></div><span class="num">$${fmt(v)}</span></div>`).join('');
+  $('lines').innerHTML = '<tr><th>Line</th><th>HDB blocks</th><th>HDB $psf</th><th>Private projects</th><th>Private $psf</th></tr>' +
+    P.proposed_lines.map(l => `<tr><td>${l.line}</td><td>${fmt(l.hdb_blocks_with_sales)}</td><td>$${fmt(l.hdb_median_psf)}</td><td>${fmt(l.private_projects)}</td><td>${l.private_median_psf ? '$' + fmt(l.private_median_psf) : '–'}</td></tr>`).join('');
+})();
+</script>
+</body>
+</html>

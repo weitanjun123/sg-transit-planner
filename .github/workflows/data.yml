@@ -35,6 +35,12 @@ jobs:
         run: python scripts/fetch_hdb.py
         continue-on-error: true
 
+      - name: Home prices (HDB resale; URA private if key added)
+        env:
+          URA_ACCESS_KEY: ${{ secrets.URA_ACCESS_KEY }}
+        run: python scripts/fetch_prices.py
+        continue-on-error: true
+
       - name: Early wakers / night owls report
         run: python scripts/report.py
         continue-on-error: true
@@ -45,6 +51,10 @@ jobs:
 
       - name: Gap analysis + proposed lines
         run: python scripts/analyse.py
+
+      - name: Prices vs MRT
+        run: python scripts/prices.py
+        continue-on-error: true
 
       - name: Commit data
         run: |

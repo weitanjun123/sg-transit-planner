@@ -87,7 +87,7 @@ def main():
         by_blk[blk].append((lat, lon))
     cp = f"{RAW}/geocode_cache.json"   # exact OneMap points from earlier runs, used when present
     cache = json.load(open(cp)) if os.path.exists(cp) else {}
-    blocks, missed, used = [], defaultdict(int), set()
+    blocks, missed, used, coords = [], defaultdict(int), set(), {}
     for r in recs:
         town = TOWNS.get(r.get("bldg_contract_town"), ("", None, None))
         exact = cache.get(f"{r['blk_no']}|{r['street']}")
@@ -102,7 +102,9 @@ def main():
                 missed[r.get("bldg_contract_town")] += 1; continue
             used.add((lat, lon))
         blocks.append([lat, lon, int(r.get("total_dwelling_units") or 0), int(r.get("year_completed") or 0), town[0]])
+        coords[f"{r['blk_no'].strip().upper()}|{r['street'].strip().upper()}"] = [lat, lon, town[0]]
     json.dump(blocks, open("docs/data/hdb_blocks.json", "w"), separators=(",", ":"))
+    json.dump(coords, open(f"{RAW}/hdb_block_coords.json", "w"), separators=(",", ":"))   # used to place resale prices
     units = sum(b[2] for b in blocks)
     print(f"hdb_blocks.json: {len(blocks)}/{len(recs)} residential blocks located ({units:,} flats); not matched: {dict(missed)}")
 

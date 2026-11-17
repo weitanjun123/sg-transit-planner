@@ -32,7 +32,7 @@
 <body>
 <div id="panel">
   <h1>SG Transit Planner</h1>
-  <div class="mute">Open-source MRT gap finder · <a href="./">home</a> · <a href="sim.html">pixel MRT sim</a> · <a href="compare.html">ridership compare</a> · <a href="report.html">early wakers</a> · <a href="insights.html">deep dive</a> · <a href="heartbeat.html">heartbeat</a></div>
+  <div class="mute">Open-source MRT gap finder · <a href="./">home</a> · <a href="sim.html">pixel MRT sim</a> · <a href="compare.html">ridership compare</a> · <a href="report.html">early wakers</a> · <a href="insights.html">deep dive</a> · <a href="heartbeat.html">heartbeat</a> · <a href="prices.html">prices</a></div>
   <div id="banner"></div>
   <h2>Network year</h2>
   <div class="yr" id="years"></div>
@@ -44,6 +44,9 @@
   <label class="tg"><input type="checkbox" id="lyCrowd" checked> Today's AM-peak crowd (LTA)</label>
   <label class="tg"><input type="checkbox" id="lyBus" checked> People bussing to the MRT each morning</label>
   <label class="tg"><input type="checkbox" id="lyTrack"> Busiest track, 7–9am</label>
+  <label class="tg"><input type="checkbox" id="lyHdbPx"> HDB resale $ per sq ft (last 12 months)</label>
+  <label class="tg"><input type="checkbox" id="lyPrivPx"> Condo / EC / landed $ per sq ft</label>
+  <div id="pxLegend" class="mute"></div>
   <label class="tg"><input type="checkbox" id="lyGapMin"> Shade gaps by morning minutes on the train</label>
   <h2>Colour stations by</h2>
   <select id="colorBy" style="width:100%;background:#252932;color:#e9ecf1;border:1px solid #3a404c;border-radius:8px;padding:7px">
@@ -85,7 +88,7 @@ L.control.layers(BASE, null, {position:'topright'}).addTo(map);
 map.on('baselayerchange', e => { try { localStorage.setItem('sgtp_base', e.name); } catch (err) {} });
 map.setMinZoom(11); map.setMaxBounds([[1.144, 103.535], [1.494, 104.502]]);
 const G = { net:L.layerGroup().addTo(map), gaps:L.layerGroup().addTo(map), prop:L.layerGroup().addTo(map),
-            fut:L.layerGroup().addTo(map), crowd:L.layerGroup().addTo(map), bus:L.layerGroup().addTo(map), track:L.layerGroup().addTo(map) };
+            fut:L.layerGroup().addTo(map), crowd:L.layerGroup().addTo(map), bus:L.layerGroup().addTo(map), track:L.layerGroup().addTo(map), px:L.layerGroup().addTo(map) };
 const YEARS = [[2026.9,'Today'],[2027,'2027'],[2028.6,'2028'],[2030,'2030'],[2032,'2032'],[2040,'2040']];
 let ST, AN, FC, INS, year = 2026.9;
 function drawBus() {
@@ -144,6 +147,23 @@ function legend(by) {
     weekend: `${sw('#5aa9ff')}quieter on weekends ${sw('#cccccc')}same ${sw('#ff8c42')}busier on weekends`,
     back: `${sw('#cccccc')}almost all come back by MRT ${sw('#e5484d')}many don't (75% or less)`};
   document.getElementById('legend').innerHTML = (L_[by] || '') + (by !== 'line' ? '<br>Grey = no data. Future stations keep line colours.' : '');
+}
+let PX = null;
+async function drawPrices() {
+  G.px.clearLayers();
+  const hdbOn = document.getElementById('lyHdbPx').checked, privOn = document.getElementById('lyPrivPx').checked;
+  if (!hdbOn && !privOn) { document.getElementById('pxLegend').innerHTML = ''; return; }
+  if (!PX) PX = await get('data/prices.json');
+  if (!PX) return;
+  const sw = c => `<i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c};margin:0 4px 0 6px;vertical-align:middle"></i>`;
+  if (hdbOn && PX.hdb) for (const [lat, lon, psf, n, trend, town, blk, price, dist, stn] of PX.hdb.blocks)
+    L.circleMarker([lat, lon], {radius: 3, stroke:false, fillColor: ramp((psf - 450) / 550, '#3fbf7f', '#e5484d'), fillOpacity:.85})
+      .bindPopup(`<b>Blk ${blk}</b> (${town})<br>$${fmt(psf)} psf · median price $${fmt(price)} · ${n} sales in 12 months<br>12-month change: ${trend == null ? '–' : (trend >= 0 ? '+' : '') + trend + '%'}<br>${fmt(dist)} m to ${stn} MRT`).addTo(G.px);
+  if (privOn && PX.private) for (const [lat, lon, psf, n, trend, name, type, segm, dist, stn] of PX.private.projects)
+    L.circleMarker([lat, lon], {radius: 4, color:'#14161a', weight:1, fillColor: ramp((psf - 1200) / 1800, '#5aa9ff', '#b478ff'), fillOpacity:.9})
+      .bindPopup(`<b>${name}</b> (${type}, ${segm})<br>$${fmt(psf)} psf · ${n} sales in 12 months<br>12-month change: ${trend == null ? '–' : (trend >= 0 ? '+' : '') + trend + '%'}<br>${fmt(dist)} m to ${stn} MRT`).addTo(G.px);
+  document.getElementById('pxLegend').innerHTML = (hdbOn ? `HDB ${sw('#3fbf7f')}$450 ${sw('#e5484d')}$1,000+ psf` : '') +
+    (privOn ? (PX.private ? `<br>Private ${sw('#5aa9ff')}$1,200 ${sw('#b478ff')}$3,000+ psf` : '<br>Private prices appear once the URA key is added.') : '') + ' · <a href="prices.html">prices &amp; the MRT</a>';
 }
 function drawTrack() {
   G.track.clearLayers();
@@ -250,7 +270,8 @@ function panel() {
     b.onclick = () => { year = y; [...yb.children].forEach(c => c.className = ''); b.className = 'on'; drawNetwork(); }; yb.appendChild(b); });
   drawNetwork(); drawCrowd(); drawBus(); if (AN) { drawAnalysis(); panel(); }
   document.getElementById('lyBus').onchange = drawBus;
-  document.getElementById('lyTrack').onchange = drawTrack; document.getElementById('lyGapMin').onchange = drawAnalysis;
+  document.getElementById('lyTrack').onchange = drawTrack;
+  document.getElementById('lyHdbPx').onchange = drawPrices; document.getElementById('lyPrivPx').onchange = drawPrices; document.getElementById('lyGapMin').onchange = drawAnalysis;
   try { document.getElementById('colorBy').value = localStorage.getItem('sgtp_colorBy') || 'line'; } catch (e) {}
   document.getElementById('colorBy').onchange = e => { try { localStorage.setItem('sgtp_colorBy', e.target.value); } catch (err) {} drawNetwork(); };
   document.getElementById('hbPlay').onclick = hbToggle; addEventListener('resize', () => hbOn && hbSize());

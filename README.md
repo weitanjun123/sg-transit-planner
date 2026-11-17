@@ -60,6 +60,7 @@ cd docs && python -m http.server   # open http://localhost:8000
 - HDB Property Information (data.gov.sg, Singapore Open Data Licence)
 - HDB Existing Buildings footprints (data.gov.sg) to locate each block
 - OneMap (Singapore Land Authority) basemap tiles, free and keyless
+- HDB resale flat prices from Jan 2017 (data.gov.sg) and URA Data Service private residential transactions (free key)
 - LTA monthly public transport ridership 2019–2025 (lta.gov.sg statistics)
 - URA Master Plan 2014 country boundary via [yinshanyang/singapore](https://github.com/yinshanyang/singapore) (pixel-sim coastline)
 - LTA station points via [cheeaun/sgraildata](https://github.com/cheeaun/sgraildata)
