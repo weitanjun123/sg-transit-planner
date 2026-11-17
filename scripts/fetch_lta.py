@@ -46,6 +46,44 @@ def passenger_volume(key):
         build_history(saved)
 
 
+ARCHIVE = "data/archive/lta"
+MONTHLY = {"PV/Train": "train_station", "PV/ODTrain": "train_od", "PV/Bus": "bus_stop", "PV/ODBus": "bus_od"}
+MAX_BYTES = 95 * 1024 * 1024  # GitHub rejects files over 100 MB
+
+
+def archive_all_monthly(key):
+    """Full database: keep LTA's original monthly zip for every passenger-volume dataset, forever.
+    LTA only serves the last 3 months, so anything not saved here is lost. Each file is downloaded once."""
+    import hashlib
+    mpath = f"{ARCHIVE}/manifest.json"
+    man = json.load(open(mpath)) if os.path.exists(mpath) else {"note": "Original LTA DataMall passenger-volume zips, one per dataset per month", "files": {}}
+    d = dt.datetime.now(SGT).date().replace(day=1)
+    months = []
+    for _ in range(4):
+        d = (d - dt.timedelta(days=1)).replace(day=1); months.append(d.strftime("%Y%m"))
+    for api, folder in MONTHLY.items():
+        os.makedirs(f"{ARCHIVE}/{folder}", exist_ok=True)
+        for ym in months:
+            rel = f"{folder}/{ym}.zip"
+            if rel in man["files"]:
+                continue
+            try:
+                link = get(api, key, Date=ym)["value"][0]["Link"]
+                blob = requests.get(link, timeout=300).content
+            except Exception as e:
+                print(f"{api} {ym}: not available ({e})"); continue
+            entry = {"api": api, "month": f"{ym[:4]}-{ym[4:]}", "bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest(),
+                     "downloaded_sgt": dt.datetime.now(SGT).isoformat(timespec="minutes")}
+            if len(blob) > MAX_BYTES:
+                entry["stored"] = False; entry["reason"] = "over GitHub's 100 MB file limit"
+            else:
+                open(f"{ARCHIVE}/{rel}", "wb").write(blob); entry["stored"] = True
+            man["files"][rel] = entry
+            print(f"{api} {ym}: {len(blob)/1e6:.1f} MB {'saved' if entry['stored'] else 'TOO BIG, not stored'}")
+    man["updated_sgt"] = dt.datetime.now(SGT).isoformat(timespec="minutes")
+    json.dump(man, open(mpath, "w"), indent=1, sort_keys=True)
+
+
 def day_counts(ym):
     """Weekdays and weekend days in a month (public holidays are not removed)."""
     y, m = int(ym[:4]), int(ym[4:])
@@ -109,6 +147,8 @@ def crowd(key):
     json.dump(live, open(f"{OUT}/crowd_now.json", "w"), separators=(",", ":"))
     os.makedirs(RAW, exist_ok=True)
     json.dump(forecast, open(f"{RAW}/crowd_forecast_{now:%Y%m%d}.json", "w"), separators=(",", ":"))
+    os.makedirs(f"{RAW}/crowd_live", exist_ok=True)
+    json.dump(live, open(f"{RAW}/crowd_live/{now:%Y%m%d_%H%M}.json", "w"), separators=(",", ":"))
     print(f"crowd: forecast for {len(forecast['stations'])} stations, live for {len(live['stations'])}")
 
 
@@ -118,4 +158,5 @@ if __name__ == "__main__":
         sys.exit("LTA_ACCOUNT_KEY not set - add it as a repo secret")
     os.makedirs(OUT, exist_ok=True)
     passenger_volume(key)
+    archive_all_monthly(key)
     crowd(key)
