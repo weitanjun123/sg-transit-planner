@@ -13,9 +13,7 @@ RAW = "data/raw/amenities"
 DATASETS = {   # data.gov.sg dataset ids
     "schools": "d_688b934f82c1059ed0a6993d2a829089",       # MOE General information of schools (address + postal code)
     "hawker": "d_4a086da0a5553be1d89383cd90d07ecd",        # NEA Hawker Centres (GEOJSON)
-    "supermarkets": "d_8a77ee0446716b2ce475a587004afc73",  # SFA Supermarkets (KML)
     "parks": "d_0542d48f0991541706b58059381a6eca",         # NParks Parks (points)
-    "polyclinics": "d_86c255436322859ab5e13a08ce8ea3a0",   # polyclinic locations
     "clinics": "d_548c33ea2d99e29ec63a7cc9edcccedc",       # MOH CHAS clinics (GP clinics)
 }
 GRANTS = "d_a223380e5856cf06f7eac223e5902230"              # HDB CPF Housing Grants Awarded by Type
@@ -134,6 +132,27 @@ def main():
         json.dump(cache, open(cp, "w"))
         pts["primary_schools"], pts["secondary_schools"] = prim, sec
         print(f"schools: {len(prim)} primary, {len(sec)} secondary located ({sum(1 for v in cache.values() if not v)} postal codes not found)")
+    # polyclinics: no current data.gov.sg list, so ask OneMap for every building named "... Polyclinic" (cached 30 days)
+    pp = f"{RAW}/polyclinics.json"
+    if not fresh(pp, 30):
+        found, page = {}, 1
+        try:
+            while page <= 20:
+                r = requests.get("https://www.onemap.gov.sg/api/common/elastic/search",
+                                 params={"searchVal": "polyclinic", "returnGeom": "Y", "getAddrDetails": "Y", "pageNum": page}, timeout=30).json()
+                for x in r.get("results", []):
+                    b = x.get("BUILDING", "")
+                    if b.upper().endswith("POLYCLINIC"):
+                        found[b] = [round(float(x["LATITUDE"]), 6), round(float(x["LONGITUDE"]), 6), b.title()]
+                if page >= int(r.get("totalNumPages", 1)):
+                    break
+                page += 1; time.sleep(0.3)
+            if len(found) >= 15:
+                json.dump(list(found.values()), open(pp, "w"))
+        except Exception as e:
+            print(f"polyclinics: {e}")
+    if os.path.exists(pp):
+        pts["polyclinics"] = json.load(open(pp)); print(f"polyclinics: {len(pts['polyclinics'])} places")
     if os.path.exists("data/manual/hospitals.csv"):
         pts["hospitals"] = [[float(r["lat"]), float(r["lon"]), r["name"]] for r in csv.DictReader(open("data/manual/hospitals.csv"))]
     json.dump(pts, open(f"{RAW}/points.json", "w"), separators=(",", ":"))
