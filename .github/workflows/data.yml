@@ -35,6 +35,10 @@ jobs:
         run: python scripts/fetch_hdb.py
         continue-on-error: true
 
+      - name: Early wakers / night owls report
+        run: python scripts/report.py
+        continue-on-error: true
+
       - name: Gap analysis + proposed lines
         run: python scripts/analyse.py
 

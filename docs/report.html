@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner — Early wakers & night owls</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --blue:#5aa9ff; --red:#e5484d; --green:#3fbf7f; --line:#2b3038; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:920px; margin:0 auto; padding:18px 14px 70px; }
+  h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:18px; margin:30px 0 6px; } h3 { font-size:14px; margin:14px 0 6px; color:var(--mute); font-weight:600; }
+  a { color:var(--gold); } .mute { color:var(--mute); font-size:13px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; }
+  .find { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; }
+  .find .card b { color:var(--gold); }
+  .seg { display:inline-flex; flex-wrap:wrap; border:1px solid #3a404c; border-radius:8px; overflow:hidden; margin:4px 0 8px; }
+  .seg button { background:#252932; color:var(--ink); border:0; padding:6px 10px; font:inherit; font-size:13px; cursor:pointer; }
+  .seg button.on { background:var(--gold); color:#111; font-weight:600; }
+  .row { display:grid; grid-template-columns:22px 1fr 1.1fr 70px; gap:8px; align-items:center; padding:4px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .bar { height:9px; background:#252932; border-radius:5px; overflow:hidden; } .bar i { display:block; height:100%; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { padding:6px 4px; border-bottom:1px solid var(--line); text-align:right; }
+  td:first-child, th:first-child, td:nth-child(2), th:nth-child(2) { text-align:left; } th { color:var(--mute); font-weight:500; }
+  select { background:#252932; color:var(--ink); border:1px solid #3a404c; border-radius:8px; padding:6px 8px; font:inherit; }
+  svg text { fill:var(--mute); font-size:20px; }
+  #tip { min-height:22px; color:var(--gold); font-size:13px; }
+</style>
+</head>
+<body><main>
+  <h1>Early wakers &amp; night owls</h1>
+  <div class="mute"><a href="./">home</a> · <a href="map.html">gap map</a> · <a href="compare.html">ridership compare</a> · <a href="sim.html">pixel sim</a></div>
+  <p class="mute" id="meta"></p>
+  <div class="find" id="find"></div>
+
+  <h2>🌅 Which stations wake up earliest?</h2>
+  <div class="seg" id="earlyTab"><button data-v="early_share">% of the day's tap-ins before 7am</button><button data-v="early_5am">Most people at 5am</button><button data-v="earliest_rush">Earliest average morning</button></div>
+  <div class="card" id="early"></div>
+
+  <h2>📏 Does it matter how far you live from the CBD?</h2>
+  <div class="seg" id="distTab"><button data-v="top">Distance to Raffles Place</button><button data-v="own">Distance to where riders tap out</button></div>
+  <div class="card"><div id="distText" class="mute"></div><div id="scatter"></div><div id="tip">Tap a dot to see the station.</div></div>
+  <div class="find">
+    <div class="card"><h3>Earlier than their distance suggests</h3><div id="exEarly" class="mute"></div></div>
+    <div class="card"><h3>Later than their distance suggests</h3><div id="exLate" class="mute"></div></div>
+  </div>
+
+  <h2>🌙 Which stations go to sleep latest?</h2>
+  <div class="seg" id="lateTab"><button data-v="late_share">% of tap-outs after 11pm</button><button data-v="late_count">Most people home after 11pm</button><button data-v="night_in">Where nights out end (tap-ins after 9pm)</button></div>
+  <div class="card" id="late"></div>
+
+  <h2>🔁 Point to point</h2>
+  <div class="seg" id="pairTab"><button data-v="pairs_am">Busiest trips 7–9am</button><button data-v="pairs_night">Busiest trips after 10pm</button><button data-v="late_home">Last trains home: where to, and from</button></div>
+  <div class="card" id="pairs"></div>
+
+  <h2>🔎 Any station, hour by hour</h2>
+  <div class="card"><select id="stSel"></select> <span class="seg" id="dayTab" style="vertical-align:middle"><button data-v="weekday">Weekdays</button><button data-v="weekend">Weekends</button></span><div id="hourly"></div></div>
+
+  <h2>How this was worked out</h2>
+  <p class="mute" id="method"></p>
+</main>
+<script>
+const $ = id => document.getElementById(id), fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
+const hm = h => { const m = Math.round(h * 60); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; };
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], ml = m => `${MON[+m.slice(5) - 1]} ${m.slice(0, 4)}`;
+let R, state = {early:'early_share', dist:'top', late:'late_share', pair:'pairs_am', day:'weekday', st:'Kranji'};
+try { Object.assign(state, JSON.parse(localStorage.getItem('sgtp_report') || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem('sgtp_report', JSON.stringify(state)); } catch (e) {} };
+
+function tab(id, key, fn) {
+  const el = $(id), paint = () => [...el.children].forEach(b => b.classList.toggle('on', b.dataset.v === state[key]));
+  el.onclick = e => { if (!e.target.dataset.v) return; state[key] = e.target.dataset.v; paint(); fn(); save(); }; paint(); fn();
+}
+function bars(el, rows, val, label, color, note) {
+  const max = Math.max(...rows.map(val));
+  el.innerHTML = rows.map((r, i) => `<div class="row"><span class="mute">${i + 1}</span><span>${r.name}${note ? ` <span class="mute">${note(r)}</span>` : ''}</span>
+    <div class="bar"><i style="width:${(val(r) / max * 100).toFixed(1)}%;background:${color}"></i></div><span class="num">${label(r)}</span></div>`).join('');
+}
+function renderEarly() {
+  const k = state.early, rows = R[k];
+  if (k === 'early_share') bars($('early'), rows, r => r.in_before7_pct, r => r.in_before7_pct.toFixed(1) + '%', 'var(--gold)', r => `${fmt(r.in_per_day)}/day`);
+  if (k === 'early_5am') bars($('early'), rows, r => r.in_5am_per_day, r => fmt(r.in_5am_per_day), 'var(--gold)', r => `of ${fmt(r.in_per_day)}/day`);
+  if (k === 'earliest_rush') bars($('early'), rows, r => 11 - r.am_rush_mid, r => hm(r.am_rush_mid), 'var(--gold)', r => r.am_trip_km ? `${r.am_trip_km} km trips` : '');
+  $('early').insertAdjacentHTML('beforeend', `<div class="mute" style="margin-top:6px">${{early_share:'Share of all weekday tap-ins that happen 5:00–6:59am.', early_5am:'People tapping in 5:00–5:59am on an average weekday.', earliest_rush:'Average tap-in time between 4am and noon, weekdays: a lower time means the station\'s morning starts earlier.'}[k]} Stations with under ${fmt(R.min_daily)} tap-ins a day are left out.</div>`);
+}
+function renderLate() {
+  const k = state.late, rows = R[k];
+  if (k === 'late_share') bars($('late'), rows, r => r.out_after23_pct, r => r.out_after23_pct.toFixed(1) + '%', 'var(--blue)', r => `${fmt(r.in_per_day)}/day`);
+  if (k === 'late_count') bars($('late'), rows, r => r.out_after23_per_day, r => fmt(r.out_after23_per_day), 'var(--blue)');
+  if (k === 'night_in') bars($('late'), rows, r => r.in_after21_per_day, r => fmt(r.in_after21_per_day), 'var(--blue)');
+  $('late').insertAdjacentHTML('beforeend', `<div class="mute" style="margin-top:6px">${{late_share:'Share of a station\'s weekday tap-outs that happen 11pm–1am: people getting home late.', late_count:'People tapping out 11pm–1am on an average weekday.', night_in:'People tapping in 9pm–midnight on an average weekday: where evenings out end.'}[k]}</div>`);
+}
+function renderPairs() {
+  const k = state.pair, rows = R[k];
+  if (k === 'late_home') { $('pairs').innerHTML = `<table><tr><th>#</th><th>Getting home to</th><th>Trips/day 11pm–1am</th><th>Mostly from</th></tr>` +
+    rows.map((r, i) => `<tr><td>${i + 1}</td><td>${r.to}</td><td>${fmt(r.trips_per_day)}</td><td>${r.mostly_from.join(', ')}</td></tr>`).join('') + '</table>'; return; }
+  $('pairs').innerHTML = `<table><tr><th>#</th><th>From → to</th><th>Trips/day</th><th>km</th><th>Return trips/day (all day)</th></tr>` +
+    rows.map((r, i) => `<tr><td>${i + 1}</td><td>${r.from} → ${r.to}</td><td>${fmt(r.trips_per_day)}</td><td>${r.km}</td><td>${fmt(r.return_trips_per_day)}</td></tr>`).join('') +
+    `</table><div class="mute" style="margin-top:6px">${k === 'pairs_am' ? 'Weekday trips that start 7:00–8:59am.' : 'Weekday trips that start 10pm–1am.'} "Return" = the same pair the other way round, over the whole day.</div>`;
+}
+function renderDist() {
+  const D = R.distance, top = D.to_top_destination, own = state.dist === 'own';
+  const xi = own ? 1 : 4, rr = own ? D.spearman_rush_mid : top.spearman_rush_mid, mpk = own ? D.minutes_earlier_per_km : top.minutes_earlier_per_km;
+  const strength = Math.abs(rr) >= .6 ? 'strong' : Math.abs(rr) >= .35 ? 'moderate' : 'little to no';
+  $('distText').innerHTML = own
+    ? `Using the distance to the stations each station's riders actually tap out at (7–9am), there is <b>${strength}</b> link (rank correlation ${rr}). Many people tap out at a nearby interchange to change to a bus, or work locally (e.g. Woodlands, Jurong), so this distance understates their real commute.`
+    : `Across ${D.stations} "home" stations, the further a station is from <b>${top.station}</b> (the #1 morning destination), the earlier its morning starts: a <b>${strength}</b> link (rank correlation ${rr}). Roughly <b>${mpk} minutes earlier per extra km</b>, so a station 15 km out starts its rush about ${Math.round(mpk * 15)} minutes earlier than one in town.`;
+  const pts = D.scatter, W = 900, H = 420, L = 70, Rm = 16, T = 16, B = 46;
+  const xs = pts.map(p => p[xi]), ys = pts.map(p => p[3]);
+  const x0 = 0, x1 = Math.ceil(Math.max(...xs)), y0 = Math.floor(Math.min(...ys) * 2) / 2, y1 = Math.ceil(Math.max(...ys) * 2) / 2;
+  const X = v => L + (W - L - Rm) * (v - x0) / (x1 - x0), Y = v => T + (H - T - B) * (v - y0) / (y1 - y0);
+  let g = '';
+  for (let v = y0; v <= y1 + 1e-9; v += .25) g += `<line x1="${L}" x2="${W - Rm}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2b3038"/><text x="${L - 8}" y="${Y(v) + 6}" text-anchor="end">${hm(v)}</text>`;
+  for (let v = 0; v <= x1; v += x1 > 12 ? 4 : 2) g += `<text x="${X(v)}" y="${H - 18}" text-anchor="middle">${v} km</text>`;
+  // trend line
+  const n = xs.length, mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n;
+  const sl = xs.reduce((a, v, i) => a + (v - mx) * (ys[i] - my), 0) / xs.reduce((a, v) => a + (v - mx) ** 2, 0);
+  g += `<line x1="${X(0)}" y1="${Y(my - sl * mx)}" x2="${X(x1)}" y2="${Y(my + sl * (x1 - mx))}" stroke="#f2c14e" stroke-width="3" stroke-dasharray="10 8"/>`;
+  pts.forEach((p, i) => g += `<circle data-i="${i}" cx="${X(p[xi])}" cy="${Y(p[3])}" r="${5 + Math.sqrt(p[5]) / 30}" fill="#5aa9ff" fill-opacity=".55" stroke="#5aa9ff"/>`);
+  $('scatter').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%">${g}</svg><div class="mute">↑ earlier morning · each dot is a home station (size = riders) · → ${own ? 'trip-weighted km to tap-out stations' : 'km to ' + top.station} · dashed = trend</div>`;
+  $('scatter').querySelector('svg').onclick = e => { const i = e.target.dataset?.i; if (i == null) return; const p = pts[i];
+    $('tip').textContent = `${p[0]}: average morning tap-in ${hm(p[3])}, ${p[2].toFixed(1)}% before 7am, ${p[4]} km from ${top.station}, ${fmt(p[5])} tap-ins/day`; };
+  $('exEarly').innerHTML = `<span class="mute">vs the trend for their distance to ${top.station}</span><br>` + D.earlier_than_distance_suggests.map(r => `${r.name} (${r.km} km): ${Math.abs(r.minutes)} min earlier`).join('<br>');
+  $('exLate').innerHTML = `<span class="mute">vs the trend for their distance to ${top.station}</span><br>` + D.later_than_distance_suggests.map(r => `${r.name} (${r.km} km): ${r.minutes} min later`).join('<br>');
+}
+function renderHourly() {
+  const s = R.stations.find(x => x.name === state.st) || R.stations[0], d = s[state.day];
+  const W = 900, H = 300, L = 70, B = 40, T = 12, max = Math.max(...d.hourly_in, ...d.hourly_out, 1) * 1.08;
+  const X = h => L + (W - L - 12) * h / 23, Y = v => T + (H - T - B) * (1 - v / max);
+  let g = ''; for (let k = 0; k <= 4; k++) { const v = max / 1.08 * k / 4; g += `<line x1="${L}" x2="${W - 12}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2b3038"/><text x="${L - 8}" y="${Y(v) + 6}" text-anchor="end">${v >= 1000 ? Math.round(v / 100) / 10 + 'k' : Math.round(v)}</text>`; }
+  for (let h = 0; h < 24; h += 3) g += `<text x="${X(h)}" y="${H - 10}" text-anchor="middle">${h}h</text>`;
+  const line = (arr, c) => `<polyline fill="none" stroke="${c}" stroke-width="4" points="${arr.map((v, h) => `${X(h)},${Y(v)}`).join(' ')}"/>`;
+  $('hourly').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%">${g}${line(d.hourly_in, '#f2c14e')}${line(d.hourly_out, '#5aa9ff')}</svg>
+    <div class="mute"><span style="color:var(--gold)">━ taps in</span> · <span style="color:var(--blue)">━ taps out</span> · per ${state.day === 'weekday' ? 'weekday' : 'weekend day'} · ${fmt(d.in_per_day)} in / ${fmt(d.out_per_day)} out a day · ${d.in_before7_pct}% of tap-ins before 7am · ${d.out_after23_pct}% of tap-outs after 11pm</div>`;
+}
+(async () => {
+  R = await (await fetch('data/report.json', {cache:'no-store'})).json();
+  const D = R.distance, top = D.to_top_destination, e = R.early_share[0], e5 = R.early_5am[0], ln = R.late_count[0], ni = R.night_in[0], lr = R.latest_rush[0], am = R.pairs_am[0];
+  $('meta').textContent = `LTA DataMall tap data for ${R.months.map(ml).join(', ')} (${R.days.WEEKDAY} weekdays, ${R.days.WEEKEND} weekend/holiday days), averaged per day. Updated ${R.generated.slice(0, 10)}; refreshes when a new month is archived.`;
+  $('find').innerHTML = [
+    `<b>Earliest riser: ${e.name}.</b> ${e.in_before7_pct.toFixed(0)}% of its tap-ins happen before 7am.`,
+    `<b>Biggest 5am crowd: ${e5.name}</b>, ${fmt(e5.in_5am_per_day)} people tap in 5–6am on a weekday, more than any other station.`,
+    `<b>Distance matters:</b> the further from ${top.station}, the earlier the morning: about ${top.minutes_earlier_per_km} min earlier per km (rank correlation ${top.spearman_rush_mid}).`,
+    `<b>Latest to sleep: ${ln.name}.</b> ${fmt(ln.out_after23_per_day)} people get home there after 11pm on a weekday. Nights out end at <b>${ni.name}</b> (${fmt(ni.in_after21_per_day)} tap-ins after 9pm).`,
+    `<b>Latest-starting station: ${lr.name}</b>, average morning tap-in ${hm(lr.am_rush_mid)}: work stations fill up rather than empty out.`,
+    `<b>Busiest morning trip: ${am.from} → ${am.to}</b> (${fmt(am.trips_per_day)} trips 7–9am).`
+  ].map(t => `<div class="card">${t}</div>`).join('');
+  $('stSel').innerHTML = R.stations.map(s => s.name).sort().map(n => `<option ${n === state.st ? 'selected' : ''}>${n}</option>`).join('');
+  $('stSel').onchange = ev => { state.st = ev.target.value; renderHourly(); save(); };
+  tab('earlyTab', 'early', renderEarly); tab('lateTab', 'late', renderLate); tab('pairTab', 'pair', renderPairs); tab('distTab', 'dist', renderDist); tab('dayTab', 'day', renderHourly);
+  $('method').innerHTML = `Tap counts are LTA's hourly totals per station, so the earliest slot is 5:00–5:59am. Interchanges are one station. "Home" stations in the distance test are those where at least 1.5× more people tap in than out at 7–9am (${D.stations} stations; ${D.excluded_work_stations} work/city stations excluded). Distances are straight-line. Trip pairs come from LTA's origin–destination file and count the station where people tap out, which is not always their final stop (many change to a bus). Rankings skip stations with under ${fmt(R.min_daily)} weekday tap-ins a day. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/report.py">scripts/report.py</a>.`;
+})();
+</script>
+</body>
+</html>
