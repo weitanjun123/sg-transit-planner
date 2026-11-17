@@ -74,7 +74,8 @@ function townChart() {
   try { localStorage.setItem('sgtp_prices', JSON.stringify(state)); } catch (e) {}
 }
 (async () => {
-  P = await (await fetch('data/prices.json', {cache:'no-store'})).json();
+  try { const r = await fetch('data/prices.json', {cache:'no-store'}); if (!r.ok) throw 0; P = await r.json(); }
+  catch (e) { $('meta').textContent = 'Price data is not published yet. It usually appears a few minutes after the data bot runs; please refresh shortly.'; return; }
   if (!P.hdb) { $('meta').textContent = 'Price data is still loading; the data bot fills this in on its next run.'; return; }
   const H = P.hdb;
   $('meta').textContent = `${fmt(H.sales_used)} HDB resale sales placed on the map (to ${ml(H.latest_month)}); updated ${P.generated.slice(0, 10)}.`;
