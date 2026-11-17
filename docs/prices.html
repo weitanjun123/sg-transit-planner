@@ -88,7 +88,7 @@ function townChart() {
   $('effects').innerHTML = H.new_station_effect.map(e => `<div class="card"><h3>${e.opening} <span class="mute">(opened ${ml(e.opened)})</span></h3>
     <div>${e.blocks_gaining_station} blocks gained a station · ${e.towns.join(', ')}</div>
     <div style="margin-top:6px">Near the new station: ${pc(e.near_new_station_change_pct)} · rest of town: ${pc(e.rest_of_town_change_pct)}</div>
-    <div class="big" style="margin-top:4px">${e.difference_pts >= 0 ? '+' : ''}${e.difference_pts} pts</div><div class="mute">relative to the rest of the town${e.after_window_complete ? '' : ' · the 2 years after opening are not complete yet'} · sales ${e.sales.join(' / ')}</div></div>`).join('') || '<div class="mute">Not enough sales yet.</div>';
+    <div class="big" style="margin-top:4px">${e.difference_pts >= 0 ? '+' : ''}${e.difference_pts} pts</div><div class="mute">relative to the rest of the town${e.after_window_complete ? '' : ' · the 2 years after opening are not complete yet'}${e.low_confidence ? ' · <b>few comparison sales, treat with caution</b>' : ''} · sales ${e.sales.join(' / ')}</div></div>`).join('') || '<div class="mute">Not enough sales yet.</div>';
   // towns
   const sel = $('town'); sel.innerHTML = ['All HDB', ...Object.keys(H.town_median_psf_12m)].map(t => `<option ${t === state.town ? 'selected' : ''}>${t}</option>`).join('');
   sel.onchange = e => { state.town = e.target.value; townChart(); };

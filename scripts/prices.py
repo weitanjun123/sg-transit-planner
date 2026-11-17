@@ -73,6 +73,8 @@ def main():
                 near_cache[k] = nearest(c[0], c[1])
             sales.append({"k": k, "lat": c[0], "lon": c[1], "town": r["town"].title(), "month": r["month"], "type": r["flat_type"],
                           "psf": psf, "price": float(r["resale_price"]), "lease": int(r["lease_commence_date"] or 0)})
+        this_month = dt.date.today().strftime("%Y-%m")
+        sales = [s for s in sales if s["month"] < this_month]          # skip the month still being registered
         last = max(s["month"] for s in sales)
         m12, m24 = mshift(last, -11), mshift(last, -23)
         # town-month medians (for compare page and for "relative to town" measures)
@@ -148,7 +150,7 @@ def main():
             effects.append({"opening": op["name"], "opened": op["date"], "blocks_gaining_station": len(treated), "towns": sorted(control_towns),
                             "near_new_station_change_pct": round(100 * (ta / tb - 1), 1), "rest_of_town_change_pct": round(100 * (ca / cb - 1), 1),
                             "difference_pts": round(100 * ((ta / tb) - (ca / cb)), 1), "sales": [ntb, nta, ncb, nca],
-                            "after_window_complete": after[1] <= last})
+                            "after_window_complete": after[1] <= last, "low_confidence": min(ntb, nta, ncb, nca) < 100})
         out["hdb"] = {"latest_month": last, "sales_used": len(sales), "sales_unplaced": miss, "blocks": blocks,
                       "towns_monthly": towns_monthly, "town_median_psf_12m": {t: round(v) for t, v in sorted(town12.items(), key=lambda kv: -kv[1])},
                       "mrt_premium": premium, "new_station_effect": effects}
