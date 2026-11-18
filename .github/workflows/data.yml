@@ -72,6 +72,10 @@ jobs:
         run: python scripts/future.py
         continue-on-error: true
 
+      - name: New towns (Punggol & Sengkang vs Tengah)
+        run: python scripts/newtowns.py
+        continue-on-error: true
+
       - name: Watch list (rising stations + LTA forecast accuracy)
         run: python scripts/watch.py
         continue-on-error: true

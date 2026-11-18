@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG Transit Planner — Punggol &amp; Sengkang vs Tengah</title>
+<style>
+  :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --blue:#5aa9ff; --red:#e5484d; --green:#3fbf7f; --line:#2b3038; --pg:#5aa9ff; --sk:#b48cff; --tg:#3fbf7f; }
+  * { box-sizing:border-box; }
+  html { font-size:clamp(14px, 3.6vw, 16px); }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; line-height:1.5; }
+  main { max-width:58rem; margin:0 auto; padding:1.1rem 4% 4rem; }
+  h1 { font-size:1.4rem; margin:0 0 0.25rem; } h2 { font-size:1.15rem; margin:2rem 0 0.25rem; } h3 { font-size:0.95rem; margin:0.5rem 0; }
+  a { color:var(--gold); } .mute { color:var(--mute); font-size:0.85rem; } .lead { color:#cfd5de; margin:0.25rem 0 0.6rem; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:0.75rem; padding:0.8rem 4%; margin:0.6rem 0; min-width:0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap:0.6rem; }
+  table { display:block; max-width:100%; overflow-x:auto; border-collapse:collapse; font-size:0.85rem; -webkit-overflow-scrolling:touch; }
+  td, th { padding:0.35rem 0.3rem; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; } td:first-child, th:first-child { text-align:left; } th { color:var(--mute); font-weight:500; }
+  .big { font-size:1.5rem; font-weight:700; } .up { color:var(--green); } .down { color:var(--red); }
+  .note { background:#3a2f12; color:#f6dfa0; padding:0.6rem 0.8rem; border-radius:0.5rem; font-size:0.85rem; }
+  .seg { display:inline-flex; flex-wrap:wrap; border:1px solid #3a404c; border-radius:0.5rem; overflow:hidden; } .seg button { background:#252932; color:var(--ink); border:0; padding:0.35rem 0.7rem; font:inherit; font-size:0.85rem; cursor:pointer; } .seg button.on { background:var(--gold); color:#111; font-weight:600; }
+  .key { display:flex; flex-wrap:wrap; gap:0.3rem 1rem; font-size:0.85rem; margin:0.3rem 0; } .key i { display:inline-block; width:0.9em; height:0.25em; vertical-align:middle; margin-right:0.35em; border-radius:2px; }
+  svg { width:100%; height:auto; display:block; } svg text { fill:var(--mute); font-size:15px; }
+  ul.ms { margin:0.3rem 0; padding-left:1.1rem; font-size:0.85rem; }
+</style>
+</head>
+<body><main>
+  <h1>Punggol &amp; Sengkang vs Tengah</h1>
+  <div class="mute"><a href="./">home</a> · <a href="prices.html">home prices</a> · <a href="map.html">gap map</a></div>
+  <p class="lead">Do new towns' prices follow the same path? Punggol and Sengkang went from empty land to mature towns over 20 years; Tengah, the "forest town", got its first residents in August 2023. Here are their starting prices (BTO), their resale paths, and what early BTO buyers ended up with — so Tengah can be tracked against them as its own resales begin.</p>
+  <div class="note" id="status"></div>
+
+  <h2>1 · Starting price: what BTO buyers paid</h2>
+  <p class="lead">4-room BTO launch prices (midpoint of HDB's price range, before grants) as a share of the average HDB resale $psf that year. Below 100% = cheaper than an average resale flat; it lets a 2008 launch and a 2023 launch be compared fairly.</p>
+  <div class="card"><div class="seg" id="ft"></div><div class="key" id="key1"></div><div id="c1"></div><div id="t1"></div></div>
+
+  <h2>2 · The resale path, lined up by town age</h2>
+  <p class="lead">Each town's median resale $psf compared with the whole HDB market, by years since the town's first busy resale year (200+ resales: Sengkang 2003, Punggol 2006; Tengah expected around 2028 when the first flats reach MOP). Above 100% = dearer than the average HDB flat.</p>
+  <div class="card"><div class="seg" id="mode"></div><div class="key" id="key2"></div><div id="c2"></div><div class="mute" id="c2note"></div></div>
+
+  <h2>3 · What early BTO buyers got at MOP</h2>
+  <p class="lead">For each launch year: BTO price vs the median resale price of the same flat type, same town, built that year, sold in the first two years after its 5-year MOP. "Beyond market" strips out how much the whole HDB market rose over the same years.</p>
+  <div class="card"><div class="seg" id="ft3"></div><div id="t3"></div></div>
+
+  <h2>4 · If Tengah follows Punggol &amp; Sengkang</h2>
+  <div class="card" id="proj"></div>
+
+  <h2>5 · Any early sign in Tengah's neighbours?</h2>
+  <div class="card" id="nb"></div>
+
+  <h2>Milestones</h2>
+  <div class="grid" id="ms"></div>
+  <p class="mute" id="foot"></p>
+</main>
+<script>
+const $ = id => document.getElementById(id), fmt = n => n == null ? '–' : Math.round(n).toLocaleString('en-SG');
+const COL = {Punggol: 'var(--pg)', Sengkang: 'var(--sk)', Tengah: 'var(--tg)'}, HEX = {Punggol: '#5aa9ff', Sengkang: '#b48cff', Tengah: '#3fbf7f'};
+const pc = v => v == null ? '–' : `<span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${v}%</span>`;
+let D, ft = '4-room', ft3 = '4-room', mode = 'rel';
+try { const s = JSON.parse(localStorage.getItem('sgtp_newtowns') || '{}'); ft = s.ft || ft; ft3 = s.ft3 || ft3; mode = s.mode || mode; } catch (e) {}
+const save = () => { try { localStorage.setItem('sgtp_newtowns', JSON.stringify({ft, ft3, mode})); } catch (e) {} };
+
+function lineChart(series, opt) {        // series: [{name, pts:[[x,y]...], dash}]
+  const W = 480, H = 270, L = 50, R = 10, T = 12, B = 34;
+  const xs = series.flatMap(s => s.pts.map(p => p[0])), ys = series.flatMap(s => s.pts.map(p => p[1])).concat(opt.yRef != null ? [opt.yRef] : []);
+  if (!xs.length) return '<div class="mute">No data yet.</div>';
+  const x0 = Math.min(...xs), x1 = Math.max(...xs, x0 + 1), y0 = Math.min(...ys) * 0.95, y1 = Math.max(...ys) * 1.04;
+  const X = x => L + (W - L - R) * (x - x0) / (x1 - x0), Y = y => T + (H - T - B) * (1 - (y - y0) / (y1 - y0));
+  let g = '';
+  for (let k = 0; k <= 4; k++) { const v = y0 + (y1 - y0) * k / 4; g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2b3038"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${opt.yFmt(v)}</text>`; }
+  const step = Math.max(1, Math.ceil((x1 - x0) / 8));
+  for (let x = Math.ceil(x0); x <= x1; x += step) g += `<text x="${X(x)}" y="${H - 10}" text-anchor="middle">${opt.xFmt(x)}</text>`;
+  if (opt.yRef != null) g += `<line x1="${L}" x2="${W - R}" y1="${Y(opt.yRef)}" y2="${Y(opt.yRef)}" stroke="#9aa3ae" stroke-dasharray="4 4"/>`;
+  for (const s of series) {
+    if (!s.pts.length) continue;
+    g += `<polyline fill="none" stroke="${HEX[s.name]}" stroke-width="3" ${s.dash ? 'stroke-dasharray="6 5"' : ''} points="${s.pts.map(p => `${X(p[0])},${Y(p[1])}`).join(' ')}"/>`;
+    g += s.pts.map(p => `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="3.5" fill="${HEX[s.name]}"><title>${s.name} ${opt.xFmt(p[0])}: ${opt.yFmt(p[1])}</title></circle>`).join('');
+  }
+  return `<svg viewBox="0 0 ${W} ${H}">${g}</svg>`;
+}
+const key = (names, extra) => names.map(n => `<span><i style="background:${COL[n]}"></i>${n}</span>`).join('') + (extra || '');
+const segs = (el, opts, cur, on) => { el.innerHTML = opts.map(([v, l]) => `<button data-v="${v}" class="${v === cur ? 'on' : ''}">${l}</button>`).join(''); el.onclick = e => { if (e.target.dataset.v) on(e.target.dataset.v); }; };
+
+function draw1() {
+  segs($('ft'), [['3-room', '3-room'], ['4-room', '4-room'], ['5-room', '5-room']], ft, v => { ft = v; save(); draw1(); });
+  const towns = ['Sengkang', 'Punggol', 'Tengah'];
+  $('key1').innerHTML = key(towns, '<span class="mute">dashed line = 100%, the average resale $psf</span>');
+  const ser = towns.map(t => ({name: t, pts: (D.bto[t] && D.bto[t][ft] || []).filter(b => b.vs_market).map(b => [b.fy, b.vs_market * 100])}));
+  $('c1').innerHTML = lineChart(ser, {xFmt: x => 'FY' + String(x).slice(2), yFmt: v => Math.round(v) + '%', yRef: 100});
+  const rows = [];
+  for (const t of towns) for (const b of (D.bto[t] && D.bto[t][ft] || [])) rows.push([b.fy, t, b]);
+  rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
+  $('t1').innerHTML = `<details><summary class="mute">Every launch year (${ft})</summary><table><tr><th>FY</th><th>Town</th><th>Price range</th><th>≈ $psf</th><th>vs resale market</th></tr>` +
+    rows.map(([fy, t, b]) => `<tr><td>FY${fy}</td><td style="text-align:left;color:${COL[t]}">${t}</td><td>$${fmt(b.min / 1000)}k – $${fmt(b.max / 1000)}k</td><td>$${fmt(b.psf)}</td><td>${Math.round(b.vs_market * 100)}%</td></tr>`).join('') + '</table></details>';
+}
+function draw2() {
+  segs($('mode'), [['rel', 'vs whole HDB market'], ['psf', '$psf by calendar year']], mode, v => { mode = v; save(); draw2(); });
+  const towns = ['Sengkang', 'Punggol', 'Tengah'];
+  $('key2').innerHTML = key(towns);
+  const ser = towns.map(t => { const T = D.towns[t], y0 = T.year0;
+    return {name: t, pts: Object.entries(T.years).filter(([y]) => mode === 'psf' || (y0 && +y >= y0)).map(([y, v]) => mode === 'rel' ? [+y - y0, v.rel * 100] : [+y, v.psf])}; });
+  $('c2').innerHTML = mode === 'rel' ? lineChart(ser, {xFmt: x => 'yr ' + x, yFmt: v => Math.round(v) + '%', yRef: 100}) : lineChart(ser, {xFmt: x => "'" + String(x).slice(2), yFmt: v => '$' + Math.round(v)});
+  const S = D.towns.Sengkang.years, P = D.towns.Punggol.years;
+  $('c2note').textContent = mode === 'rel'
+    ? `Year 0 = Sengkang ${D.towns.Sengkang.year0}, Punggol ${D.towns.Punggol.year0}. Both started a little above the market, drifted back to about average over their first 10–12 years as more flats were completed, then pulled ahead again from about 2018 — Punggol more strongly. Tengah's line starts when its first flats reach MOP (about 2028).`
+    : 'Median resale $ per sq ft of all flats sold in the town that year (all flat types). Before 2012 HDB recorded the approval month; from March 2012, the registration month.';
+}
+function draw3() {
+  segs($('ft3'), [['3-room', '3-room'], ['4-room', '4-room'], ['5-room', '5-room']], ft3, v => { ft3 = v; save(); draw3(); });
+  const rows = D.cohorts.filter(c => c.type === ft3).sort((a, b) => a.launch_fy - b.launch_fy || a.town.localeCompare(b.town));
+  $('t3').innerHTML = '<table><tr><th>Launch</th><th>Town</th><th>BTO price</th><th>MOP</th><th>Resale at MOP</th><th>Gain</th><th>Market rose</th><th>Beyond market</th></tr>' +
+    rows.map(c => `<tr><td>FY${c.launch_fy}</td><td style="text-align:left;color:${COL[c.town]}">${c.town}</td><td>$${fmt(c.bto_mid)}</td><td>~${c.mop_year}</td>` +
+      (c.status === 'done' ? `<td>$${fmt(c.resale_median_at_mop)} <span class="mute">(${c.resales_at_mop})</span></td><td>${pc(c.gain_pct)}</td><td>${pc(c.market_change_pct)}</td><td><b>${pc(c.beyond_market_pct)}</b></td>`
+        : `<td colspan="4" class="mute" style="text-align:left">${c.status}</td>`) + '</tr>').join('') + '</table>' +
+    '<div class="mute" style="margin-top:0.4rem">Assumes about 4 years from launch to completion (COVID-era launches took longer, so their MOP may be a year later). Resale = median of that flat type, same town, lease starting in the completion year or the year after, sold 5–6 years later; at least 30 sales. "Market rose" = HDB Resale Price Index from the launch year to the MOP year.</div>';
+}
+function draw4() {
+  const P = D.projection;
+  if (!P) { $('proj').innerHTML = '<div class="mute">Not enough data yet.</div>'; return; }
+  $('proj').innerHTML = `<p style="margin-top:0">Across ${P.basis.replace(' launch years', ' launch years')}, buyers' flats were worth <b>${Math.round(P.gain_low_pct)}% to ${Math.round(P.gain_high_pct)}% more</b> than the BTO price at MOP (middle half; median ${Math.round(P.gain_mid_pct)}%). Strip out the whole market's rise and the gain was still <b>about ${Math.round(P.beyond_market_mid_pct)}%</b> (range ${Math.round(P.beyond_market_range_pct[0])}–${Math.round(P.beyond_market_range_pct[1])}%): the built-in BTO discount closing as the town fills in.</p>` +
+    '<table><tr><th>Tengah 4-room launch</th><th>BTO price</th><th>MOP around</th><th>Low</th><th>Middle</th><th>High</th></tr>' +
+    P.tengah.map(t => `<tr><td>FY${t.launch_fy}</td><td>$${fmt(t.bto_mid)}</td><td>${t.mop_year}</td>${t.if_like_punggol_sengkang.map(v => `<td>$${fmt(v)}</td>`).join('')}</tr>`).join('') + '</table>' +
+    `<div class="mute" style="margin-top:0.4rem">What a Tengah 4-room could resell for at MOP if it repeats Punggol's and Sengkang's gains. Not a forecast: their gains depended on how the whole market moved in those years (from +1% to +52%), and Tengah's first flats took about 5 years to build. Real Tengah resale prices will be plotted against this as they come in.</div>`;
+}
+function draw5() {
+  const N = D.neighbours;
+  if (!N) { $('nb').innerHTML = '<div class="mute">Not enough data yet.</div>'; return; }
+  $('nb').innerHTML = `<p style="margin-top:0">Bukit Batok and Choa Chu Kang flats within ${N.radius_km} km of Tengah's future stations, compared with flats of the <b>same age</b> elsewhere in their own town, the same month.</p>
+    <div class="grid"><div><div class="mute">${N.before} (before Tengah's first keys)</div><div class="big">${pc(N.near_vs_town_before_pct)}</div></div>
+    <div><div class="mute">${N.after}</div><div class="big">${pc(N.near_vs_town_now_pct)}</div></div>
+    <div><div class="mute">Change</div><div class="big">${N.near_change_pts >= 0 ? '+' : ''}${N.near_change_pts} pts</div></div></div>
+    <div class="mute">Sales: ${N.sales.join(' / ')} (near before / near now / rest before / rest now). So far, living next to Tengah has made ${Math.abs(N.near_change_pts) < 2 ? 'little difference' : N.near_change_pts > 0 ? 'a positive difference' : 'a negative difference'}. Matching flat age matters: many flats next to Tengah are newer, which on its own would make them look dearer.</div>`;
+}
+(async () => {
+  try { D = await (await fetch('data/newtowns.json', {cache: 'no-store'})).json(); }
+  catch (e) { $('status').textContent = 'Not published yet — the data bot builds this on its next run.'; return; }
+  const T = D.towns.Tengah;
+  $('status').innerHTML = T.year0 ? `Tengah resales have started (${T.first_resale_month}); its line now appears in section 2.`
+    : `Tengah has no resale transactions yet: its first flats (keys Aug 2023) reach their 5-year MOP around 2028. Until then the comparison uses its BTO prices; resales will be added automatically. Data to ${D.latest_month}.`;
+  draw1(); draw2(); draw3(); draw4(); draw5();
+  $('ms').innerHTML = ['Sengkang', 'Punggol', 'Tengah'].map(t => `<div class="card"><h3 style="color:${COL[t]}">${t}</h3><ul class="ms">${D.towns[t].milestones.map(([y, m]) => `<li>${y}: ${m}</li>`).join('')}</ul></div>`).join('');
+  $('foot').innerHTML = `${D.assumptions.note} Typical floor areas used for BTO $psf: ${Object.entries(D.assumptions.typical_sqm).map(([k, v]) => `${k} ${v} m²`).join(', ')}. Sources: HDB via data.gov.sg — <a href="${D.sources.bto}">BTO price ranges</a>, <a href="${D.sources.resale}">resale prices since 1990</a>, <a href="${D.sources.rpi}">Resale Price Index</a>. Updated ${new Date(D.generated).toLocaleString('en-SG', {timeZone: 'Asia/Singapore', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false})} SGT.`;
+})();
+</script>
+</body>
+</html>
