@@ -12,6 +12,7 @@ from collections import defaultdict
 SQFT = 10.7639
 RAW = "data/raw/prices"
 TOWNS = ["Sengkang", "Punggol", "Tengah"]
+FOUNDED = {"Sengkang": 1995, "Punggol": 2000, "Tengah": 2018}   # flats leased before this belong to the old rural estate, not the new town
 TYPICAL_SQM = {"2-room": 46, "3-room": 68, "4-room": 93, "5-room": 113}   # typical BTO floor areas, to put BTO prices in $psf
 MILESTONES = {
     "Sengkang": [(1997, "first flats completed (approx.)"), (2003, "North East Line and Sengkang LRT open")],
@@ -57,16 +58,16 @@ def main():
     # ---- 2. paths: yearly median $psf and relative to market, years since the first year with >= 200 resales
     out_towns = {}
     for t in TOWNS:
-        ts = [s for s in sales if s["town"] == t]
+        ts = [s for s in sales if s["town"] == t and (s["lease"] or 0) >= FOUNDED[t]]
         by_year, rel_year, n_year = defaultdict(list), defaultdict(list), defaultdict(int)
         monthly = defaultdict(list)
         for s in ts:
             y = int(s["month"][:4]); by_year[y].append(s["psf"]); n_year[y] += 1
             rel_year[y].append(s["psf"] / market[s["month"]]); monthly[s["month"]].append(s["psf"])
-        busy = [y for y in sorted(n_year) if n_year[y] >= 200]
-        y0 = busy[0] if busy else None
-        out_towns[t] = {"year0": y0, "first_resale_month": min((s["month"] for s in ts), default=None),
-                        "years": {y: {"psf": round(med(by_year[y])), "rel": round(med(rel_year[y]), 3), "n": n_year[y]} for y in sorted(by_year) if n_year[y] >= 30},
+        started = [y for y in sorted(n_year) if n_year[y] >= 10]       # year 0 = first year with new-town resales (10+ to skip stray records)
+        y0 = started[0] if started else None
+        out_towns[t] = {"year0": y0, "first_resale_month": min((s["month"] for s in ts), default=None), "excluded_old_flats": sum(1 for s in sales if s["town"] == t and (s["lease"] or 0) < FOUNDED[t]),
+                        "years": {y: {"psf": round(med(by_year[y])), "rel": round(med(rel_year[y]), 3), "n": n_year[y]} for y in sorted(by_year) if n_year[y] >= 10},
                         "monthly_psf": {m: round(med(v)) for m, v in sorted(monthly.items()) if len(v) >= 5},
                         "milestones": MILESTONES.get(t, [])}
     if not out_towns["Tengah"]["year0"]:
