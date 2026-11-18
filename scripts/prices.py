@@ -10,7 +10,7 @@ Outputs
   new_station_effect              did prices near newly opened stations rise faster than elsewhere in the same towns?
   proposed_lines                  homes within a 10-minute walk of each proposed new station
 """
-import csv, json, math, os, statistics, datetime as dt
+import csv, json, math, os, re, statistics, datetime as dt
 from collections import defaultdict
 
 SGT = dt.timezone(dt.timedelta(hours=8))
@@ -49,7 +49,7 @@ AMENITIES = [  # (key in points.json, label, radius km, how it enters the model)
 ]
 
 
-def amenity_model(sales, m12, near_cache, km):
+def amenity_model(sales, m12, near_cache, km, extra=None, extra_names=()):
     """What buyers pay for: $psf on each amenity, holding distance to the CBD, flat age, size and MRT distance fixed."""
     path = "data/raw/amenities/points.json"
     if not os.path.exists(path):
@@ -80,7 +80,7 @@ def amenity_model(sales, m12, near_cache, km):
     for s in recent:
         i = kpos[s["k"]]
         sqm = s["price"] / s["psf"] / SQM_TO_SQFT
-        rows.append([1.0, cbd[i], s["lease"], sqm, min(near_cache[s["k"]][0], 2.0)] + [feat[a[0]][i] for a in use])
+        rows.append([1.0, cbd[i], s["lease"], sqm, min(near_cache[s["k"]][0], 2.0)] + (extra(s) if extra else []) + [feat[a[0]][i] for a in use])
         y.append(s["psf"])
     X, y = np.array(rows), np.array(y)
     beta, *_ = np.linalg.lstsq(X, y, rcond=None)
@@ -94,10 +94,11 @@ def amenity_model(sales, m12, near_cache, km):
     per_km = beta[1]
     out = {"sales": len(y), "blocks": len(keys), "r2": round(float(r2), 2), "mean_psf": round(float(y.mean())),
            "controls": {"per_km_from_cbd": round(float(per_km), 1), "per_year_newer": round(float(beta[2]), 1),
-                        "per_sqm_bigger": round(float(beta[3]), 2), "per_km_from_mrt": round(float(beta[4]), 1)},
+                        "per_sqm_bigger": round(float(beta[3]), 2), "per_km_from_mrt": round(float(beta[4]), 1),
+                        **{n: round(float(beta[5 + i]), 1) for i, n in enumerate(extra_names)}},
            "effects": [], "coverage": [], "places": {a[0]: len(pts.get(a[0], [])) for a in AMENITIES}}
     for j, (key, label, r, kind) in enumerate(use):
-        b, e = float(beta[5 + j]), float(se[5 + j])
+        b, e = float(beta[5 + len(extra_names) + j]), float(se[5 + len(extra_names) + j])
         out["effects"].append({"key": key, "label": label + (" (each, up to 3)" if kind == "count3" else " (each, up to 5)" if kind == "count5" else ""),
                                "psf": round(b, 1), "se": round(e, 1), "sure": abs(b) > 2 * e,
                                "km_cbd_equiv": round(b / -per_km, 2) if per_km < 0 else None,
@@ -110,6 +111,112 @@ def amenity_model(sales, m12, near_cache, km):
                                 **{a[0]: round(100 * float((feat[a[0]][m] > 0).mean())) for a in use}})
     print(f"amenities: {len(use)} types, {len(y)} sales, R2 {r2:.2f}")
     return out
+
+
+DISTRICTS = {"01": "Raffles Place, Marina", "02": "Tanjong Pagar", "03": "Queenstown, Tiong Bahru", "04": "Telok Blangah, HarbourFront", "05": "Pasir Panjang, Clementi",
+             "06": "City Hall, Beach Road", "07": "Bugis, Golden Mile", "08": "Little India, Farrer Park", "09": "Orchard, River Valley", "10": "Bukit Timah, Holland, Tanglin",
+             "11": "Novena, Thomson", "12": "Balestier, Toa Payoh", "13": "Macpherson, Braddell", "14": "Geylang, Eunos", "15": "Katong, Marine Parade",
+             "16": "Bedok, Upper East Coast", "17": "Loyang, Changi", "18": "Tampines, Pasir Ris", "19": "Serangoon Gardens, Hougang, Punggol", "20": "Bishan, Ang Mo Kio",
+             "21": "Upper Bukit Timah, Clementi Park", "22": "Jurong", "23": "Hillview, Bukit Panjang, Choa Chu Kang", "24": "Lim Chu Kang, Tengah", "25": "Kranji, Woodgrove",
+             "26": "Upper Thomson, Springleaf", "27": "Yishun, Sembawang", "28": "Seletar, Yio Chu Kang"}
+
+
+def private_extras(rows, month_of, last, m12, m24, nearest, mrt, code2s, km):
+    """Condo / apartment / EC versions of the HDB analyses (landed homes left out)."""
+    RP = (1.28393, 103.85143)
+    P = []
+    for t in rows:
+        if not t["units"] or any(w in (t["type"] or "") for w in ("Terrace", "Detached")):
+            continue
+        ten = t.get("tenure") or ""
+        fh = ten.startswith("Freehold") or bool(re.match(r"9{3,4} yrs", ten))
+        ls = re.search(r"from (\d{4})", ten)
+        P.append({"k": (t["project"], t["street"]), "lat": t["lat"], "lon": t["lon"], "month": month_of(t["contract"]),
+                  "psf": t["price"] / t["units"] / (t["area_sqm"] * SQM_TO_SQFT), "price": t["price"] / t["units"],
+                  "d": (t["district"] or "").zfill(2), "seg": t["segment"], "fh": fh, "lease": 0 if fh else (int(ls.group(1)) if ls else None),
+                  "resale": t["sale"] == "3"})
+    P = [x for x in P if x["lease"] is not None]
+    near = {}
+    for x in P:
+        if x["k"] not in near:
+            near[x["k"]] = nearest(x["lat"], x["lon"])
+    first = min(x["month"] for x in P)
+    dname = lambda d: f"D{d} {DISTRICTS.get(d, '')}".strip()
+
+    # district price history + ranking (all sale types)
+    dm = defaultdict(lambda: defaultdict(list)); d12 = defaultdict(list)
+    for x in P:
+        dm[x["d"]][x["month"]].append(x["psf"])
+        if x["month"] >= m12:
+            d12[x["d"]].append(x["psf"])
+    allm = defaultdict(list)
+    for x in P:
+        allm[x["month"]].append(x["psf"])
+    districts_monthly = {"All condos": {m: round(med(v)) for m, v in allm.items()}}
+    districts_monthly.update({dname(d): {m: round(med(v)) for m, v in mm.items() if len(v) >= 3} for d, mm in sorted(dm.items()) if len(d12.get(d, [])) >= 30})
+    district_median_12m = {dname(d): round(med(v)) for d, v in sorted(d12.items(), key=lambda kv: -med(kv[1])) if len(v) >= 30}
+
+    # why districts differ: median $psf vs distance to Raffles Place, freehold share, lease start year (last 12 months)
+    import numpy as np
+    rowsd = []
+    for d, v in d12.items():
+        xs = [x for x in P if x["d"] == d and x["month"] >= m12]
+        if len(xs) < 30:
+            continue
+        lh = [x["lease"] for x in xs if not x["fh"]]
+        rowsd.append({"area": dname(d), "psf": med([x["psf"] for x in xs]), "km_cbd": med([km((x["lat"], x["lon"]), RP) for x in xs]),
+                      "freehold_pct": 100 * sum(x["fh"] for x in xs) / len(xs), "lease_from": med(lh) if lh else None,
+                      "new_sale_pct": 100 * sum(not x["resale"] for x in xs) / len(xs), "sales": len(xs)})
+    rowsd = [r for r in rowsd if r["lease_from"]]
+    X = np.array([[1, r["km_cbd"], r["freehold_pct"], r["lease_from"]] for r in rowsd]); y = np.array([r["psf"] for r in rowsd])
+    beta, *_ = np.linalg.lstsq(X, y, rcond=None); pred = X @ beta
+    r2 = 1 - ((y - pred) ** 2).sum() / ((y - y.mean()) ** 2).sum()
+    why = {"per_km_from_cbd": round(float(beta[1]), 1), "per_10pts_freehold": round(float(beta[2]) * 10, 1), "per_year_newer_lease": round(float(beta[3]), 1),
+           "r2": round(float(r2), 2), "areas": [{"area": r["area"], "psf": round(r["psf"]), "predicted": round(float(p)), "gap": round(r["psf"] - float(p)),
+                                                  "km_cbd": round(r["km_cbd"], 1), "freehold_pct": round(r["freehold_pct"]), "lease_from": round(r["lease_from"]),
+                                                  "new_sale_pct": round(r["new_sale_pct"]), "sales": r["sales"]} for r, p in sorted(zip(rowsd, pred), key=lambda z: -z[0]["psf"])]}
+
+    # new-station effect: resale condos whose nearest MRT went from >800 m to <600 m, vs other resale condos >800 m from any station in the same districts
+    R = [x for x in P if x["resale"]]
+    dmm = defaultdict(list)
+    for x in R:
+        dmm[(x["d"], x["month"])].append(x["psf"])
+    dmm = {k: med(v) for k, v in dmm.items()}
+    effects = []
+    for op in OPENINGS:
+        new_ids = {code2s[c]["id"] for c in op["codes"] if c in code2s}
+        new_st = [s for s in mrt if s["id"] in new_ids]
+        if not new_st:
+            continue
+        treated, dists = set(), set()
+        for x in R:
+            if x["k"] in treated:
+                continue
+            if nearest(x["lat"], x["lon"], new_st)[0] < 0.6 and nearest(x["lat"], x["lon"], skip=new_ids)[0] > 0.8:
+                treated.add(x["k"]); dists.add(x["d"])
+        if len(treated) < 3:
+            continue
+        before = (mshift(op["date"], -24), mshift(op["date"], -1)); after = (mshift(op["date"], 1), mshift(op["date"], 24))
+        def ratio(ok, lo, hi):
+            v = [x["psf"] / dmm[(x["d"], x["month"])] for x in R if lo <= x["month"] <= hi and ok(x)]
+            return med(v), len(v)
+        is_t = lambda x: x["k"] in treated
+        is_c = lambda x: x["k"] not in treated and x["d"] in dists and near[x["k"]][0] > 0.8
+        tb, ntb = ratio(is_t, *before); ta, nta = ratio(is_t, *after); cb, ncb = ratio(is_c, *before); ca, nca = ratio(is_c, *after)
+        if None in (tb, ta, cb, ca):
+            continue
+        effects.append({"opening": op["name"], "opened": op["date"], "projects_gaining_station": len(treated), "districts": [dname(d) for d in sorted(dists)],
+                        "near_new_station_change_pct": round(100 * (ta / tb - 1), 1), "rest_of_area_change_pct": round(100 * (ca / cb - 1), 1),
+                        "difference_pts": round(100 * ((ta / tb) - (ca / cb)), 1), "sales": [ntb, nta, ncb, nca],
+                        "before_window_complete": before[0] >= first, "after_window_complete": after[1] <= last,
+                        "low_confidence": min(ntb, nta, ncb, nca) < 50 or before[0] < first})
+
+    # amenities: same model as HDB, plus freehold
+    lmed = med([x["lease"] for x in P if not x["fh"]])          # freehold rows get the typical lease year, so "freehold" reads as the premium over a typical leasehold
+    PA = [dict(x, lease=lmed) if x["fh"] else x for x in P]
+    amen = amenity_model(PA, m12, near, km, extra=lambda x: [1.0 if x["fh"] else 0.0], extra_names=("freehold",))
+    return {"districts_monthly": districts_monthly, "district_median_psf_12m": district_median_12m, "district_why": why,
+            "new_station_effect": effects, "amenities": amen, "first_month": first}
 
 
 def grants_summary(sales_by_fy):
@@ -303,11 +410,11 @@ def main():
         rows = [t for t in tx if t["lat"] and t["area_sqm"] > 0 and t["price"] > 0 and month_of(t["contract"]) and month_of(t["contract"]) < this_month]
         if rows:
             last = max(month_of(t["contract"]) for t in rows); m12, m24 = mshift(last, -11), mshift(last, -23)
-            proj = defaultdict(lambda: {"now": [], "before": [], "meta": None})
+            proj = defaultdict(lambda: {"now": [], "before": [], "meta": None, "prices": [], "all": 0})
             for t in rows:
                 m = month_of(t["contract"]); psf = t["price"] / t["units"] / (t["area_sqm"] * SQM_TO_SQFT) if t["units"] else 0
-                p = proj[(t["project"], t["street"])]; p["meta"] = t
-                if m >= m12: p["now"].append(psf)
+                p = proj[(t["project"], t["street"])]; p["meta"] = t; p["all"] += t["units"] or 1
+                if m >= m12: p["now"].append(psf); p["prices"].append(t["price"] / (t["units"] or 1))
                 elif m >= m24: p["before"].append(psf)
             projects = []
             for (name, street), p in proj.items():
@@ -315,7 +422,8 @@ def main():
                     continue
                 t = p["meta"]; a, b = med(p["now"]), med(p["before"])
                 d, s = nearest(t["lat"], t["lon"])
-                projects.append([t["lat"], t["lon"], round(a), len(p["now"]), round(100 * (a - b) / b, 1) if b else None, name, t["type"], t["segment"], round(d * 1000), s["name"] if s else ""])
+                projects.append([t["lat"], t["lon"], round(a), len(p["now"]), round(100 * (a - b) / b, 1) if b and len(p["before"]) >= 2 else None, name, t["type"], t["segment"], round(d * 1000), s["name"] if s else "",
+                                 (t["district"] or "").zfill(2), round(med(p["prices"])), p["all"]])
             seg_monthly = defaultdict(lambda: defaultdict(list))
             for t in rows:
                 psf = t["price"] / t["units"] / (t["area_sqm"] * SQM_TO_SQFT) if t["units"] else 0
@@ -340,7 +448,8 @@ def main():
                         prel[(lo, hi)].append(psf / seg12[t["segment"]]); pabs[(lo, hi)].append(psf); break
             ppremium = [{"band_m": f"{lo}–{hi}" if hi < 9999 else f"{lo}+", "relative_to_segment_pct": round(100 * (med(prel[(lo, hi)]) - 1), 1) if prel[(lo, hi)] else None,
                          "median_psf": round(med(pabs[(lo, hi)])) if pabs[(lo, hi)] else None, "sales": len(prel[(lo, hi)])} for lo, hi in pbands]
-            out["private"] = {"latest_month": last, "transactions": len(rows), "projects": projects, "mrt_premium": ppremium,
+            extras = private_extras(rows, month_of, last, m12, m24, nearest, mrt, code2s, km)
+            out["private"] = {"latest_month": last, "transactions": len(rows), "projects": projects, "mrt_premium": ppremium, **extras,
                               "segments_monthly": {k: {m: round(med(v)) for m, v in mm.items()} for k, mm in seg_monthly.items()}}
             print(f"Private: {len(rows)} transactions, {len(projects)} projects sold in the last 12 months")
 

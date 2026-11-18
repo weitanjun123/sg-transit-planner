@@ -67,13 +67,17 @@ def main():
                 units += u
                 b = px_blocks.get((round(lat, 5), round(lon, 5)))
                 if b: val += u * b[7]
-        uplift = val * C["price_uplift_near_station"]
+        cval = cn = 0                                   # condos/ECs within 400 m: homes sold in URA's ~5-year window x median price (a floor)
+        for pr in (px.get("private") or {}).get("projects", []):
+            if len(pr) > 12 and any(km((pr[0], pr[1]), (p["lat"], p["lon"])) < 0.4 for p in sites):
+                cval += pr[12] * pr[11]; cn += pr[12]
+        uplift = (val + cval) * C["price_uplift_near_station"]
         pv_benefit = (time_yr + bus_yr) * ANN
         return {"name": name, "kind": kind, "cost": round(cost), "new_residents": round(residents), "daily_trips": round(trips),
                 "time_saved_per_year": round(time_yr), "buses_freed": round(buses, 1), "bus_saving_per_year": round(bus_yr),
                 "pv_benefits": round(pv_benefit), "bcr": round(pv_benefit / cost, 2) if cost else None,
                 "fare_revenue_per_year": round(trips * C["avg_fare"] * DAYS),
-                "hdb_units_within_400m": units, "land_value_uplift": round(uplift), "uplift_share_of_cost": round(uplift / cost, 2) if cost else None,
+                "hdb_units_within_400m": units, "condo_homes_within_400m": cn, "hdb_value": round(val), "condo_value": round(cval), "land_value_uplift": round(uplift), "uplift_share_of_cost": round(uplift / cost, 2) if cost else None,
                 "cost_per_daily_trip": round(cost / trips) if trips else None}
     proj = []
     for l in an.get("lines", []):

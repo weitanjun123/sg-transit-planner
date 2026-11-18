@@ -43,6 +43,16 @@ def rising():
         if stn and dist <= 600:
             near[stn].append((trend, town))
     town_med = {t: stx.median(v) for t, v in town_tr.items()}
+    # condos / ECs (URA): project trend vs its postal district's median trend
+    priv = (json.load(open("docs/data/prices.json")).get("private") or {}).get("projects", [])
+    d_tr, cnear = defaultdict(list), defaultdict(list)
+    for pr in priv:
+        if len(pr) > 10 and pr[4] is not None:
+            d_tr[pr[10]].append(pr[4])
+    d_med = {d: stx.median(v) for d, v in d_tr.items() if len(v) >= 5}
+    for pr in priv:
+        if len(pr) > 10 and pr[4] is not None and pr[9] and pr[8] <= 600 and pr[10] in d_med:
+            cnear[pr[9]].append(pr[4] - d_med[pr[10]])
     rows = []
     for name in set(a) & set(b):
         if a[name] < 3000:
@@ -53,14 +63,17 @@ def rising():
             pg = None
         else:
             pg = stx.median(t - town_med[town] for t, town in pr)
-        rows.append({"station": name, "riders_then": round(a[name]), "riders_now": round(b[name]), "riders_vs_network_pct": round(rg, 1),
+        cp = cnear.get(name, [])
+        cg = stx.median(cp) if len(cp) >= 3 else None
+        rows.append({"condo_vs_area_pts": None if cg is None else round(cg, 1), "condo_projects": len(cp), "station": name, "riders_then": round(a[name]), "riders_now": round(b[name]), "riders_vs_network_pct": round(rg, 1),
                      "price_vs_town_pts": None if pg is None else round(pg, 1), "price_trend_pct": None if not pr else round(stx.median(t for t, _ in pr), 1),
-                     "blocks": len(pr), "both": pg is not None and rg > 2 and pg > 1})
-    rows.sort(key=lambda r: -(r["riders_vs_network_pct"] + (r["price_vs_town_pts"] or 0)))
+                     "blocks": len(pr), "both": rg > 2 and ((pg is not None and pg > 1) or (cg is not None and cg > 1))})
+    rows.sort(key=lambda r: -(r["riders_vs_network_pct"] + max(r["price_vs_town_pts"] or 0, r["condo_vs_area_pts"] or 0)))
     return {"from": m0, "to": m1, "network_change_pct": round(net, 1), "both": [r for r in rows if r["both"]],
             "riders_up": sorted(rows, key=lambda r: -r["riders_vs_network_pct"])[:12],
             "riders_down": sorted(rows, key=lambda r: r["riders_vs_network_pct"])[:12],
             "prices_up": sorted([r for r in rows if r["price_vs_town_pts"] is not None], key=lambda r: -r["price_vs_town_pts"])[:12],
+            "condos_up": sorted([r for r in rows if r["condo_vs_area_pts"] is not None], key=lambda r: -r["condo_vs_area_pts"])[:12],
             "all": rows}
 
 

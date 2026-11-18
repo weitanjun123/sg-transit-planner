@@ -23,6 +23,9 @@
   .big { font-size:24px; font-weight:700; } .up { color:var(--green); } .down { color:var(--red); }
   svg text { fill:var(--mute); font-size:20px; }
   .note { background:#3a2f12; color:#f6dfa0; padding:8px 10px; border-radius:8px; font-size:13px; }
+  .card table { display:block; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .card { min-width:0; }
+  #town { max-width:100%; }
 </style>
 </head>
 <body><main>
@@ -39,9 +42,11 @@
 
   <h2>What happened when a new station opened?</h2>
   <p class="lead">Blocks whose nearest MRT went from more than 800 m to under 600 m when a line opened, against other blocks more than 800 m from any station in the same towns: price change from the 2 years before opening to the 2 years after (each sale measured against its town's median that month).</p>
-  <div class="grid" id="effects"></div>
+  <h3>HDB flats</h3><div class="grid" id="effects"></div>
+  <h3>Condos and ECs (resale)</h3><div class="grid" id="peffects"></div>
+  <p class="mute" id="peffNote"></p>
 
-  <h2>Prices by town, month on month and year on year</h2>
+  <h2>Prices by town or district, month on month and year on year</h2>
   <div class="card">
     <select id="town"></select> <span class="seg" id="cmp"><button data-v="1">Month on month</button><button data-v="12">Year on year</button></span>
     <div id="kpi" style="margin:10px 0"></div><div id="chart"></div>
@@ -52,7 +57,8 @@
 
   <h2>Why are some towns more expensive?</h2>
   <p class="lead" id="whyLead"></p>
-  <div class="card"><table id="why"></table><div class="mute" style="margin-top:6px">"Expected" = what the town's distance to Raffles Place and typical flat age predict. The gap is everything else: views, estate, flat size, scarcity, schools, amenities. Big flats cost less per sq ft, so towns with large flats look cheaper on $psf.</div></div>
+  <div class="card"><h3>HDB towns</h3><table id="why"></table><div class="mute" style="margin-top:6px">"Expected" = what the town's distance to Raffles Place and typical flat age predict. The gap is everything else: views, estate, flat size, scarcity, schools, amenities. Big flats cost less per sq ft, so towns with large flats look cheaper on $psf.</div></div>
+  <div class="card" id="pwhyCard"><h3>Condo districts</h3><p id="pwhyLead"></p><table id="pwhy"></table><div class="mute" style="margin-top:6px">Condos, apartments and ECs sold in the last 12 months, by postal district. "Expected" = what distance to Raffles Place, the share of freehold homes and how recent the leases are predict. "New sales" = share sold by developers, which usually cost more.</div></div>
 
   <h2 id="pay">What do buyers pay to live near things?</h2>
   <p class="lead" id="payLead"></p>
@@ -64,7 +70,8 @@
   <div class="card"><div id="grChart"></div><details><summary>Every grant type, households per year</summary><table id="grT"></table></details><div class="mute" style="margin-top:6px" id="grNote"></div></div>
 
   <h2>Most and least expensive HDB towns (last 12 months)</h2>
-  <div class="card" id="towns"></div>
+  <div class="card"><h3>HDB towns</h3><div id="towns"></div></div>
+  <div class="card" id="pdistCard"><h3>Condo districts (condos, apartments, ECs)</h3><div id="pdist"></div></div>
   <p class="mute">Sources: HDB resale flat prices from Jan 2017 (data.gov.sg), placed by block and street. Private: URA Data Service residential transactions. $psf = price ÷ floor area. Straight-line distances. These are associations, not proof that the MRT caused a price change; flat age, size, floor and estate also matter. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/prices.py">scripts/prices.py</a>.</p>
 </main>
 <script>
@@ -75,7 +82,8 @@ const shift = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5) - 1 + k
 let P, state = {town:'All HDB', cmp:'12'};
 try { Object.assign(state, JSON.parse(localStorage.getItem('sgtp_prices') || '{}')); } catch (e) {}
 function townChart() {
-  const tm = P.hdb.towns_monthly[state.town] || {}, ms = Object.keys(tm).sort(), last = ms[ms.length - 1], prev = shift(last, -+state.cmp);
+  const isP = !(state.town in P.hdb.towns_monthly) && P.private && P.private.districts_monthly && state.town in P.private.districts_monthly;
+  const tm = (isP ? P.private.districts_monthly[state.town] : P.hdb.towns_monthly[state.town]) || {}, ms = Object.keys(tm).sort(), last = ms[ms.length - 1], prev = shift(last, -+state.cmp);
   const a = tm[last], b = tm[prev], ch = b ? Math.round(1000 * (a - b) / b) / 10 : null;
   $('kpi').innerHTML = `<span class="big">$${fmt(a)}</span> psf in ${ml(last)} · ${ml(prev)}: $${fmt(b)} · change ${pc(ch)}`;
   const W = 900, H = 300, L = 70, B = 34, T = 10, v = ms.map(m => tm[m]), mn = Math.min(...v) * .95, mx = Math.max(...v) * 1.03;
@@ -85,7 +93,7 @@ function townChart() {
   g += `<polyline fill="none" stroke="#f2c14e" stroke-width="3" points="${v.map((x, i) => `${X(i)},${Y(x)}`).join(' ')}"/>`;
   const ib = ms.indexOf(prev); if (ib >= 0) g += `<circle cx="${X(ib)}" cy="${Y(b)}" r="7" fill="#5aa9ff"/>`;
   g += `<circle cx="${X(ms.length - 1)}" cy="${Y(a)}" r="7" fill="#f2c14e"/>`;
-  $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%">${g}</svg><div class="mute">Median HDB resale $ per sq ft per month, ${state.town}</div>`;
+  $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%">${g}</svg><div class="mute">Median ${isP ? 'condo / apartment / EC' : 'HDB resale'} $ per sq ft per month, ${state.town}${isP ? ' (all sale types, URA)' : ''}</div>`;
   try { localStorage.setItem('sgtp_prices', JSON.stringify(state)); } catch (e) {}
 }
 (async () => {
@@ -120,8 +128,28 @@ function townChart() {
     <div>${e.blocks_gaining_station} blocks gained a station · ${e.towns.join(', ')}</div>
     <div style="margin-top:6px">Near the new station: ${pc(e.near_new_station_change_pct)} · rest of town: ${pc(e.rest_of_town_change_pct)}</div>
     <div class="big" style="margin-top:4px">${e.difference_pts >= 0 ? '+' : ''}${e.difference_pts} pts</div><div class="mute">relative to the rest of the town${e.after_window_complete ? '' : ' · the 2 years after opening are not complete yet'}${e.low_confidence ? ' · <b>few comparison sales, treat with caution</b>' : ''} · sales ${e.sales.join(' / ')}</div></div>`).join('') || '<div class="mute">Not enough sales yet.</div>';
+  const PE = P.private && P.private.new_station_effect;
+  $('peffects').innerHTML = (PE || []).map(e => `<div class="card"><h3>${e.opening} <span class="mute">(opened ${ml(e.opened)})</span></h3>
+    <div>${e.projects_gaining_station} condo projects gained a station · ${e.districts.join(', ')}</div>
+    <div style="margin-top:6px">Near the new station: ${pc(e.near_new_station_change_pct)} · rest of the districts: ${pc(e.rest_of_area_change_pct)}</div>
+    <div class="big" style="margin-top:4px">${e.difference_pts >= 0 ? '+' : ''}${e.difference_pts} pts</div><div class="mute">relative to other resale condos in the same districts${e.before_window_complete ? '' : ' · <b>URA data starts ' + ml(P.private.first_month) + ', so less than 2 years before opening</b>'}${e.after_window_complete ? '' : ' · the 2 years after opening are not complete yet'}${e.low_confidence ? ' · treat with caution' : ''} · sales ${e.sales.join(' / ')}</div></div>`).join('') || '<div class="mute">Condo data not loaded yet.</div>';
+  if (PE) $('peffNote').textContent = `Condo resales only (new launches skew prices). URA keeps about 5 years of sales, from ${ml(P.private.first_month)}, so openings before about ${ml(shift(P.private.first_month, 24))} have no full "before" window; stage 2 (2021) can't be tested and Hume had too few condos.`;
+  const PW = P.private && P.private.district_why;
+  if (PW) {
+    $('pwhyLead').innerHTML = `Three things explain about <b>${Math.round(PW.r2 * 100)}%</b> of the difference between districts: <b>distance to the CBD</b> (each extra km ≈ <b>$${Math.abs(PW.per_km_from_cbd)} psf less</b>, over twice the HDB figure), <b>freehold</b> (each 10 points more freehold homes ≈ <b>$${PW.per_10pts_freehold} psf more</b>) and <b>newer leases</b> (≈ $${PW.per_year_newer_lease} psf per year).`;
+    $('pwhy').innerHTML = '<tr><th>District</th><th>Actual</th><th>Expected</th><th>Gap</th><th>km to CBD</th><th>Freehold</th><th>Lease from</th><th>New sales</th></tr>' + PW.areas.map(t =>
+      `<tr><td>${t.area}</td><td>$${fmt(t.psf)}</td><td>$${fmt(t.predicted)}</td><td><span class="${t.gap >= 0 ? 'up' : 'down'}">${t.gap >= 0 ? '+' : '−'}$${fmt(Math.abs(t.gap))}</span></td><td>${t.km_cbd}</td><td>${t.freehold_pct}%</td><td>~${t.lease_from}</td><td>${t.new_sale_pct}%</td></tr>`).join('');
+  } else $('pwhyCard').style.display = 'none';
+  if (P.private && P.private.district_median_psf_12m) {
+    const pd = Object.entries(P.private.district_median_psf_12m), pmax = pd[0][1];
+    $('pdist').innerHTML = pd.map(([t, v]) => `<div class="row"><span>${t}</span><div class="bar"><i style="width:${v / pmax * 100}%;background:#5aa9ff"></i></div><span class="num">$${fmt(v)}</span></div>`).join('');
+  } else $('pdistCard').style.display = 'none';
   // towns
-  const sel = $('town'); sel.innerHTML = ['All HDB', ...Object.keys(H.town_median_psf_12m)].map(t => `<option ${t === state.town ? 'selected' : ''}>${t}</option>`).join('');
+  const opt = t => `<option ${t === state.town ? 'selected' : ''}>${t}</option>`;
+  const PD = P.private && P.private.districts_monthly;
+  const sel = $('town'); sel.innerHTML = `<optgroup label="HDB towns">${['All HDB', ...Object.keys(H.town_median_psf_12m)].map(opt).join('')}</optgroup>` +
+    (PD ? `<optgroup label="Condo districts">${['All condos', ...Object.keys(P.private.district_median_psf_12m)].map(opt).join('')}</optgroup>` : '');
+  if (!(state.town in H.towns_monthly) && !(PD && state.town in PD)) state.town = 'All HDB';
   sel.onchange = e => { state.town = e.target.value; townChart(); };
   const seg = $('cmp'), paint = () => [...seg.children].forEach(b => b.classList.toggle('on', b.dataset.v === state.cmp));
   seg.onclick = e => { if (!e.target.dataset.v) return; state.cmp = e.target.dataset.v; paint(); townChart(); }; paint(); townChart();
@@ -135,9 +163,12 @@ function townChart() {
   if (AM) {
     const C = AM.controls;
     $('payLead').innerHTML = `Every HDB resale in the last 12 months (${fmt(AM.sales)} sales), comparing flats that are the same distance from the CBD and the MRT, the same age and the same size. Being 1 km further from Raffles Place costs <b>$${Math.abs(C.per_km_from_cbd)} psf</b>, so each amenity is also shown as "worth the same as being X km closer to the city".`;
-    $('payT').innerHTML = '<tr><th>Amenity</th><th>$psf</th><th>= km closer to CBD</th><th>Blocks that have it</th></tr>' + AM.effects.map(e =>
-      `<tr><td>${e.label}</td><td><span class="${e.sure ? (e.psf >= 0 ? 'up' : 'down') : 'mute'}">${e.psf >= 0 ? '+' : '−'}$${Math.abs(e.psf)}</span>${e.sure ? '' : ' <span class="mute">(unclear)</span>'}</td><td>${e.km_cbd_equiv == null ? '–' : (e.km_cbd_equiv >= 0 ? '' : '−') + Math.abs(e.km_cbd_equiv) + ' km'}</td><td>${e.share_of_blocks}%</td></tr>`).join('');
-    $('payNote').textContent = `"Unclear" = within the margin of error (the estimate is less than 2× its standard error). A negative value usually means the amenity sits in older or busier estates (noise, crowds, school traffic), not that people dislike it. This shows what buyers pay, not whether the amenity makes them move. Places counted: ${Object.entries(AM.places).filter(([, n]) => n).map(([k, n]) => `${n} ${k.replace('_', ' ')}`).join(', ')}. Model fit R² ${AM.r2}.`;
+    const PA = P.private && P.private.amenities, pae = k => PA && PA.effects.find(x => x.key === k);
+    const cell = e => !e ? '–' : `<span class="${e.sure ? (e.psf >= 0 ? 'up' : 'down') : 'mute'}">${e.psf >= 0 ? '+' : '−'}$${Math.abs(e.psf)}</span>${e.sure ? '' : ' <span class="mute">(unclear)</span>'}`;
+    $('payT').innerHTML = '<tr><th>Amenity</th><th>HDB $psf</th><th>= km closer to CBD</th><th>HDB blocks that have it</th>' + (PA ? '<th>Condo $psf</th>' : '') + '</tr>' + AM.effects.map(e =>
+      `<tr><td>${e.label}</td><td><span class="${e.sure ? (e.psf >= 0 ? 'up' : 'down') : 'mute'}">${e.psf >= 0 ? '+' : '−'}$${Math.abs(e.psf)}</span>${e.sure ? '' : ' <span class="mute">(unclear)</span>'}</td><td>${e.km_cbd_equiv == null ? '–' : (e.km_cbd_equiv >= 0 ? '' : '−') + Math.abs(e.km_cbd_equiv) + ' km'}</td><td>${e.share_of_blocks}%</td>${PA ? `<td>${cell(pae(e.key))}</td>` : ''}</tr>`).join('') +
+      (PA ? `<tr><td>Freehold (condos only)</td><td>–</td><td>–</td><td>–</td><td>${PA.controls.freehold >= 0 ? '+' : '−'}$${Math.abs(PA.controls.freehold)}</td></tr>` : '');
+    $('payNote').textContent = `"Unclear" = within the margin of error (the estimate is less than 2× its standard error). A negative value usually means the amenity sits in older or busier estates (noise, crowds, school traffic), not that people dislike it. This shows what buyers pay, not whether the amenity makes them move. Places counted: ${Object.entries(AM.places).filter(([, n]) => n).map(([k, n]) => `${n} ${k.replace('_', ' ')}`).join(', ')}. Model fit R² ${AM.r2}.` + (PA ? ` Condos: ${fmt(PA.sales)} sales of condos, apartments and ECs, same controls plus freehold; each km from the CBD costs $${Math.abs(PA.controls.per_km_from_cbd)} psf and each km from the MRT $${Math.abs(PA.controls.per_km_from_mrt)} psf. Condo estimates are much less certain (fit R² ${PA.r2}) because prices vary far more between projects.` : '');
     const keys = AM.effects.map(e => e.key);
     $('cov').innerHTML = '<tr><th>Distance from CBD</th><th>Blocks</th>' + AM.effects.map(e => `<th>${e.label.split(' within')[0]}</th>`).join('') + '</tr>' +
       AM.coverage.map(c => `<tr><td>${c.band}</td><td>${fmt(c.blocks)}</td>${keys.map(k => `<td>${c[k]}%</td>`).join('')}</tr>`).join('');
