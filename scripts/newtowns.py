@@ -109,6 +109,51 @@ def main():
                                 "beyond_market_pct": round(100 * ((1 + gain) / mkt - 1), 1) if gain is not None and mkt else None, "gain_pct": round(100 * gain, 1) if gain is not None else None,
                                 "market_change_pct": round(100 * (mkt - 1), 1) if mkt else None,
                                 "status": "done" if gain is not None else ("waiting for MOP" if L + 5 >= int(last[:4]) else "too few resales")})
+    for c in cohorts:
+        c["profit"] = c["resale_median_at_mop"] - c["bto_mid"] if c["resale_median_at_mop"] else None
+
+    # ---- 3b. myth check: 3-room vs 4-room vs 5-room BTO, every town in HDB's BTO price data (MOP resales from 2017 on)
+    allsales = defaultdict(list)                     # (town, type, lease) -> [(year, price)]
+    for r in csv.DictReader(open(f"{RAW}/hdb_resale.csv", encoding="utf-8")):
+        if r["month"] >= this_month:
+            continue
+        allsales[(r["town"].title(), r["flat_type"].replace(" ROOM", "-room").lower(), int(r["lease_commence_date"]))].append((int(r["month"][:4]), float(r["resale_price"])))
+    myth = []
+    for r in B["records"]:
+        t, ft = r["town"].strip(), r["room_type"]
+        if ft not in ("3-room", "4-room", "5-room"):
+            continue
+        try:
+            lo, hi = float(r["min_selling_price"]), float(r["max_selling_price"])
+        except ValueError:
+            continue
+        if lo <= 0:
+            continue
+        fy = int(r["financial_year"]); mid = (lo + hi) / 2; L = fy + 4
+        v = [p for lease in (L, L + 1) for (y, p) in allsales.get((t, ft, lease), []) if L + 5 <= y <= L + 6]
+        if len(v) < 30:
+            continue
+        rv = med(v); mkt = (rpi_year.get(L + 5) / rpi_year[fy]) if fy in rpi_year and rpi_year.get(L + 5) else None
+        myth.append({"town": t, "type": ft, "launch_fy": fy, "bto_mid": round(mid), "mop_year": L + 5, "resales_at_mop": len(v), "resale_median_at_mop": round(rv),
+                     "profit": round(rv - mid), "gain_pct": round(100 * (rv / mid - 1), 1), "market_change_pct": round(100 * (mkt - 1), 1) if mkt else None})
+    by_type = {}
+    for ft in ("3-room", "4-room", "5-room"):
+        xs = [m for m in myth if m["type"] == ft]
+        if xs:
+            by_type[ft] = {"cohorts": len(xs), "median_gain_pct": round(stx.median(m["gain_pct"] for m in xs), 1), "median_profit": round(stx.median(m["profit"] for m in xs)),
+                           "median_bto": round(stx.median(m["bto_mid"] for m in xs))}
+    pairs = defaultdict(dict)
+    for m in myth:
+        pairs[(m["town"], m["launch_fy"])][m["type"]] = m
+    both = [(k, v) for k, v in pairs.items() if "3-room" in v and "5-room" in v]
+    marg = [(v["5-room"]["profit"] - v["3-room"]["profit"]) / (v["5-room"]["bto_mid"] - v["3-room"]["bto_mid"]) for _, v in both if v["5-room"]["bto_mid"] > v["3-room"]["bto_mid"]]
+    myth_summary = {"by_type": by_type, "pairs": len(both), "extra_dollar_return_pct": round(100 * stx.median(marg), 1) if marg else None,
+                    "extra_paid_median": round(stx.median(v["5-room"]["bto_mid"] - v["3-room"]["bto_mid"] for _, v in both)) if both else None,
+                    "extra_profit_median": round(stx.median(v["5-room"]["profit"] - v["3-room"]["profit"] for _, v in both)) if both else None,
+                    "three_beats_five_pct": round(100 * sum(1 for _, v in both if v["3-room"]["gain_pct"] > v["5-room"]["gain_pct"]) / len(both)) if both else None,
+                    "five_more_dollars_pct": round(100 * sum(1 for _, v in both if v["5-room"]["profit"] > v["3-room"]["profit"]) / len(both)) if both else None,
+                    "pair_rows": sorted([{"town": k[0], "launch_fy": k[1], **{f"{ft[0]}r_{f}": v[ft][f] for ft in ("3-room", "5-room") for f in ("bto_mid", "profit", "gain_pct")}} for k, v in both],
+                                        key=lambda r: (r["launch_fy"], r["town"]))}
     done4 = [c["gain_pct"] for c in cohorts if c["type"] == "4-room" and c["town"] in ("Punggol", "Sengkang") and c["gain_pct"] is not None]
     beyond4 = [c["beyond_market_pct"] for c in cohorts if c["type"] == "4-room" and c["town"] in ("Punggol", "Sengkang") and c["beyond_market_pct"] is not None]
     proj = None
@@ -153,7 +198,7 @@ def main():
         print(f"newtowns neighbours: {e}")
 
     out = {"generated": dt.datetime.now(SGT).isoformat(timespec="minutes"), "latest_month": last, "towns": out_towns, "bto": bto, "cohorts": cohorts,
-           "projection": proj, "neighbours": neighbours, "market_year_psf": {y: round(v) for y, v in sorted(year_mkt.items())},
+           "projection": proj, "neighbours": neighbours, "myth": myth, "myth_summary": myth_summary, "market_year_psf": {y: round(v) for y, v in sorted(year_mkt.items())},
            "sources": {"bto": B["source"], "rpi": "https://data.gov.sg/datasets/d_14f63e595975691e7c24a27ae4c07c79/view",
                        "resale": "https://data.gov.sg/collections/189/view"},
            "assumptions": {"typical_sqm": TYPICAL_SQM, "launch_to_completion_years": 4, "mop_years": 5,

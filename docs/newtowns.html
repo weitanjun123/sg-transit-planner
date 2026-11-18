@@ -42,6 +42,14 @@
   <p class="lead">For each launch year: BTO price vs the median resale price of the same flat type, same town, built that year, sold in the first two years after its 5-year MOP. "Beyond market" strips out how much the whole HDB market rose over the same years.</p>
   <div class="card"><div class="seg" id="ft3"></div><div id="t3"></div></div>
 
+  <h2 id="myth">3b · Myth check: does a 5-room make more money than a 3-room?</h2>
+  <p class="lead">Every BTO launch in HDB's price data (14 non-mature towns, FY2008 onwards) whose flats have reached MOP: BTO price vs the median resale price of the same flat type, same town, built that year, sold in the first two years after MOP. Profit shown both ways — in dollars and as % of what you paid.</p>
+  <div class="grid" id="mythCards"></div>
+  <div class="card" id="mythVerdict"></div>
+  <div class="card"><h3>Same town, same launch year: 3-room vs 5-room</h3><table id="mythPairs"></table>
+    <div class="mute" style="margin-top:0.4rem">BTO price = midpoint of HDB's launch range, before grants. Grants are bigger for smaller flats and lower incomes, so a 3-room buyer's real % return was usually even higher. Ignores stamp duty, loan interest, renovation and agent fees, which take a bigger share of a smaller gain.</div></div>
+  <details class="card"><summary>All launches by flat type</summary><table id="mythAll"></table></details>
+
   <h2>4 · If Tengah follows Punggol &amp; Sengkang</h2>
   <div class="card" id="proj"></div>
 
@@ -115,11 +123,23 @@ function draw2() {
 function draw3() {
   segs($('ft3'), [['3-room', '3-room'], ['4-room', '4-room'], ['5-room', '5-room']], ft3, v => { ft3 = v; save(); draw3(); });
   const rows = D.cohorts.filter(c => c.type === ft3).sort((a, b) => a.launch_fy - b.launch_fy || a.town.localeCompare(b.town));
-  $('t3').innerHTML = '<table><tr><th>Launch</th><th>Town</th><th>BTO price</th><th>MOP</th><th>Resale at MOP</th><th>Gain</th><th>Market rose</th><th>Beyond market</th></tr>' +
+  $('t3').innerHTML = '<table><tr><th>Launch</th><th>Town</th><th>BTO price</th><th>MOP</th><th>Resale at MOP</th><th>Profit $</th><th>Profit %</th><th>Market rose</th><th>Beyond market</th></tr>' +
     rows.map(c => `<tr><td>FY${c.launch_fy}</td><td style="text-align:left;color:${COL[c.town]}">${c.town}</td><td>$${fmt(c.bto_mid)}</td><td>~${c.mop_year}</td>` +
-      (c.status === 'done' ? `<td>$${fmt(c.resale_median_at_mop)} <span class="mute">(${c.resales_at_mop})</span></td><td>${pc(c.gain_pct)}</td><td>${pc(c.market_change_pct)}</td><td><b>${pc(c.beyond_market_pct)}</b></td>`
-        : `<td colspan="4" class="mute" style="text-align:left">${c.status}</td>`) + '</tr>').join('') + '</table>' +
+      (c.status === 'done' ? `<td>$${fmt(c.resale_median_at_mop)} <span class="mute">(${c.resales_at_mop})</span></td><td>$${fmt(c.profit)}</td><td>${pc(c.gain_pct)}</td><td>${pc(c.market_change_pct)}</td><td><b>${pc(c.beyond_market_pct)}</b></td>`
+        : `<td colspan="5" class="mute" style="text-align:left">${c.status}</td>`) + '</tr>').join('') + '</table>' +
     '<div class="mute" style="margin-top:0.4rem">Assumes about 4 years from launch to completion (COVID-era launches took longer, so their MOP may be a year later). Resale = median of that flat type, same town, lease starting in the completion year or the year after, sold 5–6 years later; at least 30 sales. "Market rose" = HDB Resale Price Index from the launch year to the MOP year.</div>';
+}
+function drawMyth() {
+  const M = D.myth_summary; if (!M) return;
+  $('mythCards').innerHTML = ['3-room', '4-room', '5-room'].filter(t => M.by_type[t]).map(t => { const b = M.by_type[t];
+    return `<div class="card"><h3>${t}</h3><div class="mute">Typical BTO price $${fmt(b.median_bto)}</div><div class="big">${pc(b.median_gain_pct)}</div><div>profit ≈ <b>$${fmt(b.median_profit)}</b></div><div class="mute">median of ${b.cohorts} town-launches</div></div>`; }).join('');
+  $('mythVerdict').innerHTML = `<p style="margin:0">Across the <b>${M.pairs}</b> towns and launch years where both were sold, the <b>3-room made the bigger % return in ${M.three_beats_five_pct === 100 ? 'every one' : M.three_beats_five_pct + '% of them'}</b>, while the <b>5-room made more dollars in ${M.five_more_dollars_pct === 100 ? 'every one' : M.five_more_dollars_pct + '% of them'}</b>. So the myth is half true: a 5-room makes more money, but only because you put in far more. The 5-room cost about <b>$${fmt(M.extra_paid_median)} more</b> and earned about <b>$${fmt(M.extra_profit_median)} more</b> — a return of only <b>~${M.extra_dollar_return_pct}%</b> on that extra money, against <b>${M.by_type['3-room'].median_gain_pct}%</b> on the 3-room's whole price.</p>`;
+  $('mythPairs').innerHTML = '<tr><th>Launch</th><th>Town</th><th>3-room BTO</th><th>3-room profit $</th><th>3-room profit %</th><th>5-room BTO</th><th>5-room profit $</th><th>5-room profit %</th></tr>' +
+    M.pair_rows.map(r => `<tr><td>FY${r.launch_fy}</td><td style="text-align:left">${r.town}</td><td>$${fmt(r['3r_bto_mid'])}</td><td>$${fmt(r['3r_profit'])}</td><td><b>${pc(r['3r_gain_pct'])}</b></td><td>$${fmt(r['5r_bto_mid'])}</td><td>$${fmt(r['5r_profit'])}</td><td>${pc(r['5r_gain_pct'])}</td></tr>`).join('');
+  $('mythAll').innerHTML = '<tr><th>Launch</th><th>Town</th><th>Type</th><th>BTO price</th><th>MOP</th><th>Resale at MOP</th><th>Profit $</th><th>Profit %</th><th>Market rose</th></tr>' +
+    D.myth.slice().sort((a, b) => a.launch_fy - b.launch_fy || a.town.localeCompare(b.town) || a.type.localeCompare(b.type)).map(m =>
+      `<tr><td>FY${m.launch_fy}</td><td style="text-align:left">${m.town}</td><td>${m.type}</td><td>$${fmt(m.bto_mid)}</td><td>~${m.mop_year}</td><td>$${fmt(m.resale_median_at_mop)} <span class="mute">(${m.resales_at_mop})</span></td><td>$${fmt(m.profit)}</td><td>${pc(m.gain_pct)}</td><td>${pc(m.market_change_pct)}</td></tr>`).join('');
+  document.querySelector('#mythAll').closest('details').querySelector('summary').textContent = `All ${D.myth.length} launches by flat type`;
 }
 function draw4() {
   const P = D.projection;
@@ -144,7 +164,7 @@ function draw5() {
   const T = D.towns.Tengah;
   $('status').innerHTML = T.year0 ? `Tengah resales have started (${T.first_resale_month}); its line now appears in section 2.`
     : `Tengah has no resale transactions yet: its first flats (keys Aug 2023) reach their 5-year MOP around 2028. Until then the comparison uses its BTO prices; resales will be added automatically. Data to ${D.latest_month}.`;
-  draw1(); draw2(); draw3(); draw4(); draw5();
+  draw1(); draw2(); draw3(); drawMyth(); draw4(); draw5();
   $('ms').innerHTML = ['Sengkang', 'Punggol', 'Tengah'].map(t => `<div class="card"><h3 style="color:${COL[t]}">${t}</h3><ul class="ms">${D.towns[t].milestones.map(([y, m]) => `<li>${y}: ${m}</li>`).join('')}</ul></div>`).join('');
   $('foot').innerHTML = `${D.assumptions.note} Typical floor areas used for BTO $psf: ${Object.entries(D.assumptions.typical_sqm).map(([k, v]) => `${k} ${v} m²`).join(', ')}. Sources: HDB via data.gov.sg — <a href="${D.sources.bto}">BTO price ranges</a>, <a href="${D.sources.resale}">resale prices since 1990</a>, <a href="${D.sources.rpi}">Resale Price Index</a>. Updated ${new Date(D.generated).toLocaleString('en-SG', {timeZone: 'Asia/Singapore', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false})} SGT.`;
 })();
