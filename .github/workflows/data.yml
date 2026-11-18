@@ -41,6 +41,10 @@ jobs:
         run: python scripts/fetch_prices.py
         continue-on-error: true
 
+      - name: New-town history (old resale files, BTO price ranges, resale index)
+        run: python scripts/fetch_newtowns.py
+        continue-on-error: true
+
       - name: Amenities (schools, hawkers, clinics, parks...) + housing grant counts
         run: python scripts/fetch_amenities.py
         continue-on-error: true
