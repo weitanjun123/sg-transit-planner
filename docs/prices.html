@@ -188,5 +188,6 @@ function townChart() {
     P.proposed_lines.map(l => `<tr><td>${l.line}</td><td>${fmt(l.hdb_blocks_with_sales)}</td><td>$${fmt(l.hdb_median_psf)}</td><td>${fmt(l.private_projects)}</td><td>${l.private_median_psf ? '$' + fmt(l.private_median_psf) : '–'}</td></tr>`).join('');
 })();
 </script>
+<script src="sortable.js"></script>
 </body>
 </html>

@@ -57,5 +57,6 @@ const tbl = rows => `<tr><th>Stretch</th><th>Now / hr</th><th>2030 / hr</th><th>
   $('method').innerHTML = `Trips: LTA origin–destination data for ${F.months.join(', ')}, average weekday. New homes: ${A.persons_per_unit} people per home, ${A.rail_share * 100}% use the MRT, ${Math.round(A.am_share * 100)}% of a day's trips start 7–9am (from LTA data), heading where today's riders from the nearest station go. Capacity per train and trains per hour are planning assumptions (e.g. NSL/EWL ${A.capacity.NS} people × ${A.trains_per_hour.NS} trains). ${A.note} Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/future.py">scripts/future.py</a>.`;
 })();
 </script>
+<script src="sortable.js"></script>
 </body>
 </html>

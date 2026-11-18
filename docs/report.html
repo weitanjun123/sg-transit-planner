@@ -151,5 +151,6 @@ function renderHourly() {
   $('method').innerHTML = `Tap counts are LTA's hourly totals per station, so the earliest slot is 5:00–5:59am. Interchanges are one station. "Home" stations in the distance test are those where at least 1.5× more people tap in than out at 7–9am (${D.stations} stations; ${D.excluded_work_stations} work/city stations excluded). Distances are straight-line. Trip pairs come from LTA's origin–destination file and count the station where people tap out, which is not always their final stop (many change to a bus). Rankings skip stations with under ${fmt(R.min_daily)} weekday tap-ins a day. Code: <a href="https://github.com/weitanjun123/sg-transit-planner/blob/main/scripts/report.py">scripts/report.py</a>.`;
 })();
 </script>
+<script src="sortable.js"></script>
 </body>
 </html>

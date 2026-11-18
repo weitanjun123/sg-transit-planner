@@ -93,7 +93,7 @@ function draw1() {
   $('c1').innerHTML = lineChart(ser, {xFmt: x => xm === 'age' ? 'yr ' + x : 'FY' + String(x).slice(2),
       yFmt: v => ym === 'price' ? '$' + Math.round(v / 1000) + 'k' : Math.round(v) + '%', yRef: ym === 'price' ? null : 100}) +
     (ym === 'price' ? `<div class="mute">Midpoint of HDB's launch price range for ${ft} flats, before grants. Hover or tap a dot for the value; the full ranges are in the table below.</div>` : '') +
-    (xm === 'fy' ? '' : `<div class="mute">Same year 0 as section 2 (Sengkang ${y0('Sengkang')}, Punggol ${y0('Punggol')}, Tengah ${y0('Tengah')} expected). HDB's BTO price data only starts in FY2008, after Sengkang's and Punggol's year 0, while Tengah's launches all come before its year 0 — so the lines sit side by side rather than on top of each other.</div>`);
+    (xm === 'fy' ? '' : `<div class="mute">Same year 0 as section 2 (Sengkang ${y0('Sengkang')}, Punggol ${y0('Punggol')}, Tengah ${y0('Tengah')} expected). A launch sits about 10 years before its town's year 0: roughly 5 years to build (Tengah's first launch, Nov 2018, got keys in Aug 2023) plus the 5-year MOP before the first resale. So Tengah starts at about yr −10, and Sengkang's and Punggol's first launches (late 1990s) would sit there too — but HDB's BTO price data only starts in FY2008, which is already yr 6 for Sengkang and yr 3 for Punggol.</div>`);
   const rows = [];
   for (const t of towns) for (const b of (D.bto[t] && D.bto[t][ft] || [])) rows.push([b.fy, t, b]);
   rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
@@ -149,5 +149,6 @@ function draw5() {
   $('foot').innerHTML = `${D.assumptions.note} Typical floor areas used for BTO $psf: ${Object.entries(D.assumptions.typical_sqm).map(([k, v]) => `${k} ${v} m²`).join(', ')}. Sources: HDB via data.gov.sg — <a href="${D.sources.bto}">BTO price ranges</a>, <a href="${D.sources.resale}">resale prices since 1990</a>, <a href="${D.sources.rpi}">Resale Price Index</a>. Updated ${new Date(D.generated).toLocaleString('en-SG', {timeZone: 'Asia/Singapore', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false})} SGT.`;
 })();
 </script>
+<script src="sortable.js"></script>
 </body>
 </html>
