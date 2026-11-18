@@ -40,8 +40,6 @@ jobs:
           URA_ACCESS_KEY: ${{ secrets.URA_ACCESS_KEY }}
         run: python scripts/fetch_prices.py
         continue-on-error: true
-        env:
-          URA_ACCESS_KEY: ${{ secrets.URA_ACCESS_KEY }}
 
       - name: Amenities (schools, hawkers, clinics, parks...) + housing grant counts
         run: python scripts/fetch_amenities.py
