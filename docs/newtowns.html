@@ -85,13 +85,15 @@ function draw1() {
   segs($('ft'), [['3-room', '3-room'], ['4-room', '4-room'], ['5-room', '5-room']], ft, v => { ft = v; save(); draw1(); });
   const towns = ['Sengkang', 'Punggol', 'Tengah'];
   $('key1').innerHTML = key(towns, '<span class="mute">dashed line = 100%, the average resale $psf</span>');
-  const ser = towns.map(t => ({name: t, pts: (D.bto[t] && D.bto[t][ft] || []).filter(b => b.vs_market).map(b => [b.fy, b.vs_market * 100])}));
-  $('c1').innerHTML = lineChart(ser, {xFmt: x => 'FY' + String(x).slice(2), yFmt: v => Math.round(v) + '%', yRef: 100});
+  const y0 = t => D.towns[t].year0 || D.towns[t].year0_expected;
+  const ser = towns.map(t => ({name: t, pts: (D.bto[t] && D.bto[t][ft] || []).filter(b => b.vs_market).map(b => [b.fy - y0(t), b.vs_market * 100])}));
+  $('c1').innerHTML = lineChart(ser, {xFmt: x => 'yr ' + x, yFmt: v => Math.round(v) + '%', yRef: 100}) +
+    `<div class="mute">Same year 0 as section 2 (Sengkang ${y0('Sengkang')}, Punggol ${y0('Punggol')}, Tengah ${y0('Tengah')} expected). HDB's BTO price data only starts in FY2008, after Sengkang's and Punggol's year 0, while Tengah's launches all come before its year 0 — so the lines sit side by side rather than on top of each other.</div>`;
   const rows = [];
   for (const t of towns) for (const b of (D.bto[t] && D.bto[t][ft] || [])) rows.push([b.fy, t, b]);
   rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
-  $('t1').innerHTML = `<details><summary class="mute">Every launch year (${ft})</summary><table><tr><th>FY</th><th>Town</th><th>Price range</th><th>≈ $psf</th><th>vs resale market</th></tr>` +
-    rows.map(([fy, t, b]) => `<tr><td>FY${fy}</td><td style="text-align:left;color:${COL[t]}">${t}</td><td>$${fmt(b.min / 1000)}k – $${fmt(b.max / 1000)}k</td><td>$${fmt(b.psf)}</td><td>${Math.round(b.vs_market * 100)}%</td></tr>`).join('') + '</table></details>';
+  $('t1').innerHTML = `<details><summary class="mute">Every launch year (${ft})</summary><table><tr><th>FY</th><th>Town</th><th>Town year</th><th>Price range</th><th>≈ $psf</th><th>vs resale market</th></tr>` +
+    rows.map(([fy, t, b]) => `<tr><td>FY${fy}</td><td style="text-align:left;color:${COL[t]}">${t}</td><td>yr ${b.fy - y0(t)}</td><td>$${fmt(b.min / 1000)}k – $${fmt(b.max / 1000)}k</td><td>$${fmt(b.psf)}</td><td>${Math.round(b.vs_market * 100)}%</td></tr>`).join('') + '</table></details>';
 }
 function draw2() {
   segs($('mode'), [['rel', 'vs whole HDB market'], ['psf', '$psf by calendar year']], mode, v => { mode = v; save(); draw2(); });
