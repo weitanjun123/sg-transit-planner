@@ -299,7 +299,8 @@ def main():
         tx = json.load(open(up))["tx"].values()
         def month_of(c):   # URA contractDate is MMYY
             return f"20{c[2:4]}-{c[0:2]}" if c and len(c) == 4 else None
-        rows = [t for t in tx if t["lat"] and t["area_sqm"] > 0 and t["price"] > 0 and month_of(t["contract"])]
+        this_month = dt.date.today().strftime("%Y-%m")
+        rows = [t for t in tx if t["lat"] and t["area_sqm"] > 0 and t["price"] > 0 and month_of(t["contract"]) and month_of(t["contract"]) < this_month]
         if rows:
             last = max(month_of(t["contract"]) for t in rows); m12, m24 = mshift(last, -11), mshift(last, -23)
             proj = defaultdict(lambda: {"now": [], "before": [], "meta": None})
@@ -319,7 +320,27 @@ def main():
             for t in rows:
                 psf = t["price"] / t["units"] / (t["area_sqm"] * SQM_TO_SQFT) if t["units"] else 0
                 seg_monthly[t["segment"] or "?"][month_of(t["contract"])].append(psf)
-            out["private"] = {"latest_month": last, "transactions": len(rows), "projects": projects,
+            # MRT premium for condos / apartments / ECs: each sale vs its market segment's 12-month median (last 24 months)
+            pbands = [(0, 200), (200, 400), (400, 600), (600, 800), (800, 1000), (1000, 1300), (1300, 9999)]
+            seg12 = defaultdict(list)
+            for t in rows:
+                if month_of(t["contract"]) >= m12 and t["units"] and not any(w in (t["type"] or "") for w in ("Terrace", "Detached")):
+                    seg12[t["segment"]].append(t["price"] / t["units"] / (t["area_sqm"] * SQM_TO_SQFT))
+            seg12 = {k: med(v) for k, v in seg12.items() if len(v) >= 50}
+            prel, pabs = defaultdict(list), defaultdict(list); pnear = {}
+            for t in rows:
+                if month_of(t["contract"]) < m24 or t["segment"] not in seg12 or not t["units"] or any(w in (t["type"] or "") for w in ("Terrace", "Detached")):
+                    continue
+                key = (round(t["lat"], 5), round(t["lon"], 5))
+                if key not in pnear:
+                    pnear[key] = nearest(t["lat"], t["lon"])[0] * 1000
+                psf = t["price"] / t["units"] / (t["area_sqm"] * SQM_TO_SQFT)
+                for lo, hi in pbands:
+                    if lo <= pnear[key] < hi:
+                        prel[(lo, hi)].append(psf / seg12[t["segment"]]); pabs[(lo, hi)].append(psf); break
+            ppremium = [{"band_m": f"{lo}–{hi}" if hi < 9999 else f"{lo}+", "relative_to_segment_pct": round(100 * (med(prel[(lo, hi)]) - 1), 1) if prel[(lo, hi)] else None,
+                         "median_psf": round(med(pabs[(lo, hi)])) if pabs[(lo, hi)] else None, "sales": len(prel[(lo, hi)])} for lo, hi in pbands]
+            out["private"] = {"latest_month": last, "transactions": len(rows), "projects": projects, "mrt_premium": ppremium,
                               "segments_monthly": {k: {m: round(med(v)) for m, v in mm.items()} for k, mm in seg_monthly.items()}}
             print(f"Private: {len(rows)} transactions, {len(projects)} projects sold in the last 12 months")
 

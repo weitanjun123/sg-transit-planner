@@ -32,8 +32,10 @@
   <div id="privNote"></div>
 
   <h2>Does being near an MRT station cost more?</h2>
-  <p class="lead">HDB resale $ per sq ft over the last 24 months, compared with the median of the same town, by straight-line distance to the nearest MRT station.</p>
+  <p class="lead">HDB resale (and private homes below) $ per sq ft over the last 24 months, compared with the median of the same town, by straight-line distance to the nearest MRT station.</p>
   <div class="card" id="premium"></div>
+  <div class="card" id="ppremium"></div>
+  <div class="card" id="segs"></div>
 
   <h2>What happened when a new station opened?</h2>
   <p class="lead">Blocks whose nearest MRT went from more than 800 m to under 600 m when a line opened, against other blocks more than 800 m from any station in the same towns: price change from the 2 years before opening to the 2 years after (each sale measured against its town's median that month).</p>
@@ -98,6 +100,21 @@ function townChart() {
   $('premium').innerHTML = pr.map(r => `<div class="row"><span>${r.band_m} m<br><span class="mute">${fmt(r.sales)} sales · median $${fmt(r.median_psf)} psf</span></span>
     <div class="bar"><i style="width:${Math.abs(r.relative_to_town_pct || 0) / mx * 100}%;background:${(r.relative_to_town_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)'}"></i></div><span class="num">${pc(r.relative_to_town_pct)}</span></div>`).join('') +
     '<div class="mute" style="margin-top:6px">% above or below the median $psf of the same town over the last 12 months.</div>';
+  const PR = P.private;
+  if (PR && PR.mrt_premium) {
+    const pp = PR.mrt_premium, pmx = Math.max(...pp.map(r => Math.abs(r.relative_to_segment_pct || 0))) || 1;
+    $('ppremium').innerHTML = '<h3>Condos, apartments and ECs</h3>' + pp.map(r => `<div class="row"><span>${r.band_m} m<br><span class="mute">${fmt(r.sales)} sales · median $${fmt(r.median_psf)} psf</span></span>
+      <div class="bar"><i style="width:${Math.abs(r.relative_to_segment_pct || 0) / pmx * 100}%;background:${(r.relative_to_segment_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)'}"></i></div><span class="num">${pc(r.relative_to_segment_pct)}</span></div>`).join('') +
+      '<div class="mute" style="margin-top:6px">% above or below the median $psf of the same URA market segment (core central, rest of central, outside central) over the last 12 months. URA private transactions, last 24 months; landed homes left out.</div>';
+    const SEGN = {CCR: 'Core Central (CCR)', RCR: 'Rest of Central (RCR)', OCR: 'Outside Central (OCR)'};
+    const segRows = Object.entries(PR.segments_monthly).filter(([k]) => SEGN[k]).map(([k, mm]) => {
+      const ms = Object.keys(mm).sort(), last = ms[ms.length - 1], y = (+last.slice(0, 4) - 1) + last.slice(4);
+      const l3 = ms.slice(-3).map(m => mm[m]), p3 = ms.filter(m => m <= y).slice(-3).map(m => mm[m]);
+      const a = l3.reduce((x, v) => x + v, 0) / l3.length, b = p3.length ? p3.reduce((x, v) => x + v, 0) / p3.length : null;
+      return `<tr><td>${SEGN[k]}</td><td>$${fmt(a)}</td><td>${b ? '$' + fmt(b) : '–'}</td><td><span class="${b && a >= b ? 'up' : 'down'}">${b ? (a >= b ? '+' : '') + (100 * (a / b - 1)).toFixed(1) + '%' : '–'}</span></td></tr>`;
+    }).join('');
+    $('segs').innerHTML = '<h3>Private homes by region</h3><table><tr><th>Region</th><th>Last 3 months $psf</th><th>Same 3 months a year ago</th><th>Change</th></tr>' + segRows + '</table><div class="mute" style="margin-top:6px">Median of monthly medians, all private types, URA transactions. Swings with what sold: a month heavy with pricey new launches in the city fringe can push the Rest of Central above the Core Central.</div>';
+  } else { $('ppremium').style.display = 'none'; $('segs').style.display = 'none'; }
   // effects
   $('effects').innerHTML = H.new_station_effect.map(e => `<div class="card"><h3>${e.opening} <span class="mute">(opened ${ml(e.opened)})</span></h3>
     <div>${e.blocks_gaining_station} blocks gained a station · ${e.towns.join(', ')}</div>
