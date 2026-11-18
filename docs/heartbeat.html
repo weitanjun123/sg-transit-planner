@@ -117,7 +117,10 @@ function loop(now) {
 (async () => {
   const [hb, land] = await Promise.all([fetch('data/heartbeat.json').then(r => r.json()), fetch('data/sg_land.json').then(r => r.ok ? r.json() : null)]);
   HB = hb; LAND = land; fit(); addEventListener('resize', fit);
-  document.getElementById('src').textContent = 'LTA DataMall origin–destination train data, weekday average. One dot ≈ 45 trips.';
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mlist = (hb.months || []).map(m => MON[+m.slice(4) - 1] + ' ' + m.slice(0, 4));
+  const gen = hb.generated ? new Date(hb.generated).toLocaleString('en-SG', {timeZone: 'Asia/Singapore', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false}) + ' SGT' : null;
+  document.getElementById('src').textContent = `LTA DataMall origin–destination train data, weekday average${mlist.length ? ' of ' + mlist.join(', ') : ''}. One dot ≈ 45 trips.${gen ? ' Last updated ' + gen + '.' : ''}`;
   document.getElementById('play').onclick = e => { playing = !playing; e.target.textContent = playing ? '❚❚' : '▶'; };
   document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { speed = +b.dataset.s; document.querySelectorAll('[data-s]').forEach(x => x.classList.toggle('on', x === b)); });
   document.getElementById('trails').onclick = e => { trails = !trails; e.target.classList.toggle('on', trails); };

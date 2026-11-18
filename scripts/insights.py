@@ -351,6 +351,7 @@ def main():
         tot = sum(v for *_, v in flows)
         hb["hours"][h] = {"total": round(tot), "flows": [[o, d, round(v)] for o, d, v in flows[:400]]}
     hb["stations"] = {sid: [S[sid]["name"], pos[sid][0], pos[sid][1]] for sid in open_now}
+    hb["months"] = months; hb["generated"] = dt.datetime.now(SGT).isoformat(timespec="minutes")
     json.dump(hb, open("docs/data/heartbeat.json", "w"), separators=(",", ":"))
 
     json.dump({k: {kk: [round(x, 1) for x in vv] for kk, vv in v.items()} for k, v in seg.items()} | {"months": months, "note": "trips per average day by departure hour, routed on today's network"},
