@@ -63,7 +63,7 @@ def svy21_to_latlon(N, E):
 
 
 def ura_private():
-    key = os.environ.get("URA_ACCESS_KEY")
+    key = (os.environ.get("URA_ACCESS_KEY") or "").strip()
     if not key:
         print("URA: no URA_ACCESS_KEY secret yet, skipping condos/landed"); return
     path = f"{RAW}/ura_transactions.json"

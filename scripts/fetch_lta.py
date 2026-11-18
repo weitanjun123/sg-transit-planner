@@ -174,7 +174,7 @@ def crowd(key):
 
 
 if __name__ == "__main__":
-    key = os.environ.get("LTA_ACCOUNT_KEY")
+    key = (os.environ.get("LTA_ACCOUNT_KEY") or "").strip()
     if "--crowd-only" in sys.argv:          # used by the every-30-minutes peak-hour workflow
         if not key:
             sys.exit("LTA_ACCOUNT_KEY not set")
