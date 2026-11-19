@@ -6,6 +6,9 @@ cached in data/raw/gcba.geojson and refreshed every 90 days.
 
 A sale counts when it is a Detached house (not strata) whose URA location falls inside a GCBA polygon,
 or within EDGE_M metres of one with at least 1,400 m2 of land (URA gives one point per street, not per plot).
+Some URA records come with no location at all (incl. big deals like Peirce Road): for those the street is looked up on
+OneMap (free, no key); the street counts when at least half of its OneMap addresses fall inside one GCB area.
+OneMap points are cached forever in data/raw/gcb_street_points.json.
 Uncaveated sales (e.g. bought through trusts) never reach URA's data, so the list is a floor, not a full count.
 Writes docs/data/gcb.json for docs/gcb.html.
 """
@@ -15,6 +18,7 @@ import requests
 RAW = "data/raw"
 GCBA_ID = "d_6bdaba5f6cff443f4b2bc2e28a98f383"
 GCBA_PATH = f"{RAW}/gcba.geojson"
+STREETS_PATH = f"{RAW}/gcb_street_points.json"
 TX_PATH = f"{RAW}/prices/ura_transactions.json"
 OUT = "docs/data/gcb.json"
 EDGE_M = 150
@@ -88,6 +92,52 @@ def dist_m(lon, lat, ring):
     return best
 
 
+def street_points(streets):
+    cache = json.load(open(STREETS_PATH)) if os.path.exists(STREETS_PATH) else {}
+    todo = [st for st in streets if st not in cache]
+    for st in todo:
+        pts = []
+        try:
+            for page in (1, 2, 3):
+                r = requests.get("https://www.onemap.gov.sg/api/common/elastic/search",
+                                 params={"searchVal": st, "returnGeom": "Y", "getAddrDetails": "Y", "pageNum": page}, timeout=30).json()
+                for x in r.get("results", []):
+                    if (x.get("ROAD_NAME") or "").upper() == st:
+                        pts.append([round(float(x["LONGITUDE"]), 6), round(float(x["LATITUDE"]), 6)])
+                if page >= int(r.get("totalNumPages") or 1):
+                    break
+                time.sleep(0.3)
+            cache[st] = pts
+        except Exception as e:
+            print(f"OneMap {st}: {e}")
+        time.sleep(0.3)
+    if todo:
+        json.dump(cache, open(STREETS_PATH, "w"), separators=(",", ":"), sort_keys=True)
+        print(f"OneMap: looked up {len(todo)} streets")
+    return cache
+
+
+def match_street(t, areas, pts_by_street):
+    pts = [p for st in re.split(r"[\\/]", t["street"]) for p in pts_by_street.get(st.strip(), [])]
+    if not pts:
+        return None, None
+    hits = {}
+    for lon, lat in pts:
+        for a in areas:
+            if any(inside(lon, lat, r) for r in a["rings"]):
+                hits[a["name"]] = hits.get(a["name"], 0) + 1
+                break
+    if hits:
+        name, k = max(hits.items(), key=lambda x: x[1])
+        if k / len(pts) >= 0.5:
+            return name, "street"
+    if t["area_sqm"] >= 1400:
+        d, name = min((min(dist_m(lon, lat, r) for r in a["rings"] for lon, lat in pts), a["name"]) for a in areas)
+        if d <= EDGE_M:
+            return name, "edge"
+    return None, None
+
+
 def match(t, areas):
     lon, lat = t.get("lon"), t.get("lat")
     if lon is None or lat is None:
@@ -105,11 +155,12 @@ def match(t, areas):
 def main():
     areas = load_areas()
     store = json.load(open(TX_PATH))
+    det = [t for t in store["tx"].values() if t.get("type") == "Detached" and t.get("contract") and t.get("price")]
+    no_xy = sorted({st.strip() for t in det if t.get("lat") is None for st in re.split(r"[\\/]", t["street"])})
+    pts_by_street = street_points(no_xy)
     rows = []
-    for t in store["tx"].values():
-        if t.get("type") != "Detached" or not t.get("contract") or not t.get("price"):
-            continue
-        name, how = match(t, areas)
+    for t in det:
+        name, how = match(t, areas) if t.get("lat") is not None else match_street(t, areas, pts_by_street)
         if not name:
             continue
         mm, yy = t["contract"][:2], t["contract"][2:]
