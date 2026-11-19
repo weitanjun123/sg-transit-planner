@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Good Class Bungalow sales — Singapore</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <style>
   :root { --bg:#14161a; --panel:#1d2026; --ink:#e9ecf1; --mute:#9aa3ae; --gold:#f2c14e; --red:#e5484d; --green:#3fbf7f; --line:#2b3038; }
   * { box-sizing:border-box; }
@@ -23,6 +25,21 @@
   svg { width:100%; height:auto; display:block; } svg text { fill:var(--mute); font-size:13px; }
   .tag { font-size:0.7rem; color:var(--mute); border:1px solid #3a404c; border-radius:0.3rem; padding:0 0.25rem; margin-left:0.3rem; }
   input[type=search] { background:#252932; color:var(--ink); border:1px solid #3a404c; border-radius:0.5rem; padding:0.35rem 0.6rem; font:inherit; font-size:0.85rem; width:min(100%,16rem); }
+  #map { height:min(70vh,34rem); border-radius:0.75rem; border:1px solid var(--line); background:#0d0f12; }
+  .leaflet-container { font:inherit; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background:#1d2026; color:var(--ink); }
+  .leaflet-popup-content { margin:0.6rem 0.8rem; font-size:0.85rem; line-height:1.4; }
+  .leaflet-popup-content b { color:var(--gold); }
+  .pin { width:14px; height:14px; border-radius:50%; background:#8ab4ff; border:2px solid #14161a; box-shadow:0 0 0 1px #8ab4ff; }
+  .pin.gold { background:var(--gold); box-shadow:0 0 0 1px var(--gold); width:22px; height:22px; color:#111; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .pin.green { background:var(--green); box-shadow:0 0 0 1px var(--green); width:22px; height:22px; color:#111; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .clu { border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; color:#111; background:rgba(242,193,78,0.9); box-shadow:0 0 0 6px rgba(242,193,78,0.25); }
+  .dlab { background:rgba(20,22,26,0.92); border:1px solid var(--gold); border-radius:0.5rem; padding:0.3rem 0.5rem; color:var(--ink); font-size:0.75rem; white-space:nowrap; line-height:1.3; }
+  .dlab b { color:var(--gold); }
+  .legend { display:flex; flex-wrap:wrap; gap:0.3rem 1rem; font-size:0.8rem; color:var(--mute); margin:0.4rem 0; } .legend i { display:inline-block; width:0.8em; height:0.8em; border-radius:50%; margin-right:0.3em; vertical-align:-0.1em; }
+  .up { color:var(--green); } .down { color:var(--red); }
+  .buy { font-size:0.9rem; margin:0.35rem 0; } .buy b { color:var(--gold); }
+  ul.why { padding-left:1.1rem; margin:0.3rem 0; } ul.why li { margin:0.35rem 0; }
 </style>
 </head>
 <body><main>
@@ -36,6 +53,14 @@
 
   <div class="grid" id="kpis" style="margin-top:0.6rem"></div>
 
+  <h2>Map</h2>
+  <p class="mute">Numbered gold bubbles are hotspots (sales grouped together); zoom in to split them. Tap a pin for the deal. Pins sit at street level, not the exact house.</p>
+  <div class="seg" id="mapSeg">
+    <button data-v="all" class="on">All sales</button><button data-v="quantum">Top 10 quantum</button><button data-v="value">Best value $psf</button><button data-v="premium">District premium</button>
+  </div>
+  <div class="legend"><span><i style="background:#8ab4ff"></i>Sale</span><span><i style="background:#f2c14e"></i>Top 10 by price (1 = biggest)</span><span><i style="background:#3fbf7f"></i>Top 10 lowest $psf on land (1 = cheapest)</span><span><i style="background:none;border:1px dashed #f2c14e;border-radius:2px"></i>GCB area boundary</span></div>
+  <div id="map"></div>
+
   <h2>Per year</h2>
   <p class="mute">Bars = number of sales. Gold line = median price per sq ft of land.</p>
   <div class="card"><div id="chart"></div></div>
@@ -43,6 +68,18 @@
 
   <h2>By GCB area</h2>
   <div class="card"><table id="areas"></table></div>
+
+  <h2>GCB vs detached vs semi-D, same district</h2>
+  <p class="lead">Land $psf and price of GCBs against detached houses outside GCB areas and semi-detached houses in the same postal district.</p>
+  <div class="seg" id="winSeg"><button data-v="all" class="on">All saved years</button><button data-v="24m">Last 24 months</button></div>
+  <p class="mute" id="cmpNote"></p>
+  <div class="card"><h3 style="margin-top:0">GCB premium in %</h3><p class="mute">Gold = how much more a GCB costs in total (median price). Grey = difference in land $psf. Below zero means a GCB is cheaper per sq ft.</p><div id="premChart"></div></div>
+  <div class="card"><table id="cmpTable"></table></div>
+  <h3>What the top-up buys</h3>
+  <div class="card" id="buyList"></div>
+
+  <h2>Why GCBs cost more in total but often less per sq ft</h2>
+  <div class="card" id="why"></div>
 
   <h2>Every sale</h2>
   <p><input type="search" id="q" placeholder="Filter by street or area…"></p>
@@ -55,6 +92,8 @@
   URA gives one location per street, so a few sales on streets that sit on a GCB area's edge are matched by distance (≤<span id="edge">150</span> m, ≥1,400 m² land) and tagged “edge”. Some URA records have no location at all; those streets are placed using OneMap addresses.</p>
   <p class="mute">Source: URA Data Service (private residential transactions, contract date) · GCB area boundaries: URA via data.gov.sg · street lookups: OneMap. Price psf is on land area. Not financial advice.</p>
 </main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const fmtM = v => 'S$' + (v / 1e6).toFixed(v >= 1e8 ? 0 : 1) + 'M';
@@ -65,6 +104,81 @@ const n = v => v.toLocaleString('en-SG');
 const med = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : 0; };
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let D, mode = 'gcb', query = '';
+let map, cluster, extra, outlineLayer, mapView = 'all', win = 'all', lastMapKey = '';
+const pctTxt = v => v == null ? '–' : (v >= 0 ? '+' : '−') + Math.abs(Math.round(v)) + '%';
+const cls = v => v == null ? '' : v >= 0 ? 'up' : 'down';
+function popup(r) {
+  return `<b>${r.street}</b><br>${r.area} · D${r.district}<br>${MON[+r.ym.slice(5) - 1]} ${r.ym.slice(0, 4)} · ${r.tenure}<br>Land ${n(r.land_sqft)} sq ft (${n(r.land_sqm)} m²)<br>Price <b>${fmtM(r.price)}</b> · S$${n(r.psf)} psf` + (r.match === 'edge' ? '<br><span style="color:#9aa3ae">edge match</span>' : '');
+}
+function initMap() {
+  map = L.map('map', {minZoom: 11, maxZoom: 19, maxBounds: [[1.15, 103.55], [1.5, 104.1]], zoomControl: true}).setView([1.325, 103.825], 13);
+  L.tileLayer('https://www.onemap.gov.sg/maps/tiles/Night/{z}/{x}/{y}.png', {detectRetina: true, maxZoom: 19, minZoom: 11,
+    attribution: '<img src="https://www.onemap.gov.sg/web-assets/images/logo/om_logo.png" style="height:20px;width:20px;"/>&nbsp;<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener">OneMap</a>&nbsp;&copy;&nbsp;contributors&nbsp;&#124;&nbsp;<a href="https://www.sla.gov.sg/" target="_blank" rel="noopener">Singapore Land Authority</a>'}).addTo(map);
+  outlineLayer = L.layerGroup(D.outlines.map(a => L.polygon(a.rings, {color: '#f2c14e', weight: 1, dashArray: '4 4', fillColor: '#f2c14e', fillOpacity: 0.06}).bindTooltip(a.name, {sticky: true}))).addTo(map);
+  extra = L.layerGroup().addTo(map);
+}
+function drawMap(rows) {
+  const key = mode + mapView + win;
+  if (key === lastMapKey) return; lastMapKey = key;
+  if (cluster) map.removeLayer(cluster);
+  extra.clearLayers();
+  const pinned = rows.filter(r => r.lat != null);
+  const big = pinned.filter(r => !r.small);
+  const topQ = [...big].sort((a, b) => b.price - a.price).slice(0, 10);
+  const topV = [...big].sort((a, b) => a.psf - b.psf).slice(0, 10);
+  const rankQ = new Map(topQ.map((r, i) => [r, i + 1])), rankV = new Map(topV.map((r, i) => [r, i + 1]));
+  const icon = r => rankQ.has(r) ? L.divIcon({className: '', html: `<div class="pin gold">${rankQ.get(r)}</div>`, iconSize: [22, 22]})
+    : rankV.has(r) ? L.divIcon({className: '', html: `<div class="pin green">${rankV.get(r)}</div>`, iconSize: [22, 22]})
+    : L.divIcon({className: '', html: '<div class="pin"></div>', iconSize: [14, 14]});
+  cluster = L.markerClusterGroup({maxClusterRadius: 45, showCoverageOnHover: false, spiderfyOnMaxZoom: true,
+    iconCreateFunction: c => { const k = c.getChildCount(), sz = Math.min(56, 24 + Math.sqrt(k) * 7); return L.divIcon({className: '', html: `<div class="clu" style="width:${sz}px;height:${sz}px">${k}</div>`, iconSize: [sz, sz]}); }});
+  if (mapView === 'premium') {
+    D.compare.districts.forEach(d => {
+      const c = d[win]; if (!c.gcb || !c.detached || d.lat == null) return;
+      const q = (c.gcb.price / c.detached.price - 1) * 100, p = (c.gcb.psf / c.detached.psf - 1) * 100;
+      const r = Math.min(3000, 600 + Math.max(0, q) * 6);
+      L.circle([d.lat, d.lon], {radius: r, color: '#f2c14e', weight: 1, fillColor: '#f2c14e', fillOpacity: 0.18}).addTo(extra);
+      L.marker([d.lat, d.lon], {icon: L.divIcon({className: '', html: `<div class="dlab"><b>D${d.district}</b> GCB vs detached<br>Price <b>${pctTxt(q)}</b> · $psf <span class="${cls(p)}">${pctTxt(p)}</span></div>`, iconSize: null})}).addTo(extra);
+    });
+    big.forEach(r => cluster.addLayer(L.marker([r.lat, r.lon], {icon: icon(r)}).bindPopup(popup(r))));
+  } else {
+    const list = mapView === 'quantum' ? topQ : mapView === 'value' ? topV : pinned;
+    list.forEach(r => cluster.addLayer(L.marker([r.lat, r.lon], {icon: icon(r), zIndexOffset: rankQ.has(r) || rankV.has(r) ? 1000 : 0}).bindPopup(popup(r))));
+  }
+  map.addLayer(cluster);
+}
+function renderCompare() {
+  const C = D.compare;
+  $('cmpNote').textContent = win === 'all' ? `All URA sales saved by the bot (to ${C.latest}).` : `Contracts after ${C.cutoff_24m}.`;
+  const ds = C.districts.map(d => ({d: d.district, ...d[win]})).filter(x => x.gcb);
+  const W = 640, rowH = 46, H = 30 + ds.length * rowH, L0 = 70, R0 = 70;
+  const vals = ds.flatMap(x => x.detached ? [(x.gcb.price / x.detached.price - 1) * 100, (x.gcb.psf / x.detached.psf - 1) * 100] : []);
+  const lo = Math.min(0, ...vals), hi = Math.max(10, ...vals), sx = v => L0 + (v - lo) / (hi - lo) * (W - L0 - R0);
+  let svg = `<svg viewBox="0 0 ${W} ${H}"><line x1="${sx(0)}" x2="${sx(0)}" y1="10" y2="${H - 10}" stroke="#3a404c"/>`;
+  ds.forEach((x, i) => {
+    const y = 20 + i * rowH;
+    svg += `<text x="0" y="${y + 18}" fill="#e9ecf1">D${x.d}</text>`;
+    if (!x.detached) return;
+    const q = (x.gcb.price / x.detached.price - 1) * 100, p = (x.gcb.psf / x.detached.psf - 1) * 100;
+    [[q, '#f2c14e', 0], [p, '#6b7280', 18]].forEach(([v, col, dy]) => {
+      const a = sx(Math.min(0, v)), b = sx(Math.max(0, v));
+      svg += `<rect x="${a}" y="${y + dy}" width="${Math.max(1, b - a)}" height="14" fill="${col}" rx="2"/><text x="${v >= 0 ? b + 4 : a - 4}" y="${y + dy + 12}" text-anchor="${v >= 0 ? 'start' : 'end'}" fill="#e9ecf1">${pctTxt(v)}</text>`;
+    });
+  });
+  $('premChart').innerHTML = svg + '</svg>';
+  const few = g => g && g.n < 5 ? ` <span class="tag">${g.n} sale${g.n > 1 ? 's' : ''}</span>` : '';
+  $('cmpTable').innerHTML = '<tr><th>District</th><th>GCB sales</th><th>GCB $psf</th><th>Detached $psf</th><th>Semi-D $psf</th><th>GCB vs detached $psf</th><th>GCB vs semi-D $psf</th><th>GCB median (S$)</th><th>Detached median (S$)</th><th>Semi-D median (S$)</th><th>GCB vs detached price</th><th>Top-up to median GCB (S$)</th></tr>' +
+    ds.map(x => { const dd = x.detached, sd = x.semi, g = x.gcb;
+      const pd = dd ? (g.psf / dd.psf - 1) * 100 : null, ps = sd ? (g.psf / sd.psf - 1) * 100 : null, qd = dd ? (g.price / dd.price - 1) * 100 : null;
+      return `<tr><td>D${x.d}${few(g)}</td><td>${g.n}</td><td>${n(g.psf)}</td><td>${dd ? n(dd.psf) : '–'}</td><td>${sd ? n(sd.psf) : '–'}</td><td class="${cls(pd)}">${pctTxt(pd)}</td><td class="${cls(ps)}">${pctTxt(ps)}</td><td>${tM(g.price)}</td><td>${dd ? tM(dd.price) : '–'}</td><td>${sd ? tM(sd.price) : '–'}</td><td class="${cls(qd)}">${pctTxt(qd)}</td><td>${dd ? tM(g.price - dd.price) : '–'}</td></tr>`; }).join('');
+  $('buyList').innerHTML = ds.filter(x => x.detached).map(x => { const g = x.gcb, dd = x.detached, sd = x.semi;
+    const entry = g.p25_price, top = entry - dd.price;
+    return `<p class="buy"><b>D${x.d}:</b> ${fmtM(dd.price)} buys a typical detached house (${n(dd.land_sqft)} sq ft land)${sd ? `, or ${fmtM(sd.price)} a typical semi-D (${n(sd.land_sqft)} sq ft)` : ''}. ` +
+      (g.n >= 4 ? `Top up <b>${fmtM(top)}</b> to reach an entry GCB (cheaper quarter, ≈${fmtM(entry)})` : `Top up <b>${fmtM(g.price - dd.price)}</b> to reach a GCB (≈${fmtM(g.price)}, only ${g.n} sale${g.n > 1 ? 's' : ''})`) +
+      ` — about ${n(g.land_sqft)} sq ft of land, ${(g.land_sqft / dd.land_sqft).toFixed(1)}× the plot.</p>`; }).join('') +
+    '<p class="mute">Typical = median sale. Entry GCB = 25th-percentile GCB price in that district. Detached = detached houses outside GCB areas (all tenures).</p>';
+}
+
 
 function group(rows, key) { const g = {}; rows.forEach(r => (g[key(r)] ||= []).push(r)); return g; }
 
@@ -90,6 +204,7 @@ function render() {
   $('areas').innerHTML = '<tr><th>GCB area</th><th>Sales</th><th>Total value (S$)</th><th>Median $psf (land)</th><th>Top deal (S$)</th><th>Last sale</th></tr>' +
     as.map(a => `<tr><td>${a.a}</td><td>${a.n}</td><td>${tB(a.v)}</td><td>${n(Math.round(a.psf))}</td><td>${tM(a.top)}</td><td>${a.last.replace('-', '.')}</td></tr>`).join('');
 
+  drawMap(rows);
   const ql = query.toLowerCase();
   const list = rows.filter(r => !ql || (r.street + ' ' + r.area).toLowerCase().includes(ql));
   $('sales').innerHTML = '<tr><th>Contract (yr.mo)</th><th class="l">Street</th><th class="l">GCB area</th><th>District</th><th>Land sq ft</th><th>Land m²</th><th>Price (S$)</th><th>$psf</th><th class="l">Tenure</th><th class="l">Type</th></tr>' +
@@ -115,12 +230,25 @@ function drawChart(ys) {
 
 $('sizeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; mode = b.dataset.v; [...$('sizeSeg').children].forEach(x => x.classList.toggle('on', x === b)); render(); });
 $('q').addEventListener('input', e => { query = e.target.value; render(); });
+$('mapSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; mapView = b.dataset.v; [...$('mapSeg').children].forEach(x => x.classList.toggle('on', x === b)); render(); });
+$('winSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; win = b.dataset.v; [...$('winSeg').children].forEach(x => x.classList.toggle('on', x === b)); renderCompare(); lastMapKey = ''; render(); });
 
 (async () => {
   try { D = await (await fetch('data/gcb.json', {cache: 'no-store'})).json(); }
   catch (e) { $('meta').textContent = 'Data not built yet: the Data bot creates it on its next run.'; return; }
   $('meta').textContent = `Updated ${D.updated} · URA data as of ${D.ura_updated} · ${D.areas_total} GCB areas mapped`;
   $('edge').textContent = D.edge_m;
+  $('why').innerHTML = `<ul class="why">
+<li><b>The plot is huge by rule.</b> Inside GCB areas URA sets a minimum plot of 1,400 m² (about 15,070 sq ft), 18.5 m wide and 30 m deep; other bungalows need only 400 m² and 10 m. So the cheapest GCB is still 2–3× the land of a typical detached house, and the total price follows.</li>
+<li><b>Big plots sell at a lower rate per sq ft.</b> Fewer buyers can write a S$25M+ cheque, so each extra sq ft costs less. That is why GCB land $psf often sits <i>at or below</i> the smaller detached houses next door: the premium is in the quantum, not the rate.</li>
+<li><b>You can build less on it.</b> GCB site coverage is capped at 35% (sub-control) / 45% overall, versus 40% / 50% for bungalows outside GCB areas, and only bungalows are allowed in GCB areas. Buyers pay for land, greenery and privacy, not built-up floor area.</li>
+<li><b>Fixed, tiny supply.</b> Only 39 gazetted areas, about 2,500–2,800 houses, and a plot cannot be cut below 1,400 m² (with narrow exceptions). New GCBs are not being created.</li>
+<li><b>Mostly Singaporeans only.</b> Any foreign person, PRs included, needs SLA approval under the Residential Property Act to buy landed homes, so the buyer pool is mostly citizens (plus trusts, whose uncaveated deals don't appear here).</li>
+<li><b>Age and condition skew single deals.</b> Old houses on big plots trade near land value; brand-new rebuilds can fetch far more. With few GCB sales per district, one deal can move the median, so small samples are marked.</li>
+</ul>
+<p class="mute">Rules: URA Development Control (bungalow plot size &amp; width, site coverage, GCBA locational criteria) · SLA foreign ownership of property.</p>`;
+  initMap();
+  renderCompare();
   render();
 })();
 </script>

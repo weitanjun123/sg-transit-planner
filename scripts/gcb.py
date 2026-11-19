@@ -10,6 +10,8 @@ Some URA records come with no location at all (incl. big deals like Peirce Road)
 OneMap (free, no key); the street counts when at least half of its OneMap addresses fall inside one GCB area.
 OneMap points are cached forever in data/raw/gcb_street_points.json.
 Uncaveated sales (e.g. bought through trusts) never reach URA's data, so the list is a floor, not a full count.
+Also compares GCB land $psf / price with detached houses outside GCB areas and semi-detached houses in the same
+postal district (all saved years, and the last 24 months), and exports the GCB area outlines for the map.
 Writes docs/data/gcb.json for docs/gcb.html.
 """
 import datetime as dt, html, json, math, os, re, statistics, sys, time
@@ -158,18 +160,23 @@ def main():
     det = [t for t in store["tx"].values() if t.get("type") == "Detached" and t.get("contract") and t.get("price")]
     no_xy = sorted({st.strip() for t in det if t.get("lat") is None for st in re.split(r"[\\/]", t["street"])})
     pts_by_street = street_points(no_xy)
-    rows = []
+    rows, gcb_ids, in_area_small = [], set(), set()
     for t in det:
         name, how = match(t, areas) if t.get("lat") is not None else match_street(t, areas, pts_by_street)
         if not name:
             continue
+        (in_area_small if t["area_sqm"] < 1400 else gcb_ids).add(id(t))
+        lat, lon = t.get("lat"), t.get("lon")
+        if lat is None:
+            pts = [p for st in re.split(r"[\\/]", t["street"]) for p in pts_by_street.get(st.strip(), [])]
+            lon, lat = (round(sum(p[0] for p in pts) / len(pts), 6), round(sum(p[1] for p in pts) / len(pts), 6)) if pts else (None, None)
         mm, yy = t["contract"][:2], t["contract"][2:]
         sqft = t["area_sqm"] * SQM_TO_SQFT
         rows.append({"ym": f"20{yy}-{mm}", "street": t["street"].title(), "area": name, "district": t["district"],
                      "land_sqm": round(t["area_sqm"]), "land_sqft": round(sqft), "price": t["price"],
                      "psf": round(t["price"] / sqft) if sqft else None, "tenure": t["tenure"],
                      "sale": {"1": "New sale", "2": "Sub sale", "3": "Resale"}.get(str(t.get("sale")), ""),
-                     "match": how, "small": t["area_sqm"] < 1400})
+                     "match": how, "small": t["area_sqm"] < 1400, "lat": lat, "lon": lon})
     rows.sort(key=lambda r: r["ym"], reverse=True)
 
     def q(ym):
@@ -195,12 +202,63 @@ def main():
     ystats = [{"year": y["year"], "n": y["n"], "value": y["value"], "median_psf": round(statistics.median(y["psf"]))}
               for y in sorted(years.values(), key=lambda y: y["year"])]
 
+    compare = district_compare(store, det, gcb_ids, in_area_small, rows)
+    outlines = [{"name": a["name"], "rings": [[[round(y, 5), round(x, 5)] for x, y in r] for r in a["rings"]]} for a in areas]
+
     out = {"updated": dt.date.today().isoformat(), "ura_updated": store.get("updated"), "areas_total": len(areas),
-           "edge_m": EDGE_M, "sales": rows, "quarters": qstats, "years": ystats, "areas": astats}
+           "edge_m": EDGE_M, "sales": rows, "quarters": qstats, "years": ystats, "areas": astats,
+           "compare": compare, "outlines": outlines}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump(out, open(OUT, "w"), separators=(",", ":"))
     print(f"GCB: {len(rows)} sales ({sum(r['match'] == 'edge' for r in rows)} edge matches) across {len(by_area)} areas, "
           f"{rows[-1]['ym'] if rows else '-'} to {rows[0]['ym'] if rows else '-'}")
+
+
+def pct(vals, q):
+    v = sorted(vals)
+    if not v:
+        return None
+    k = (len(v) - 1) * q
+    f = math.floor(k)
+    return v[f] + (v[min(f + 1, len(v) - 1)] - v[f]) * (k - f)
+
+
+def ym_of(t):
+    return f"20{t['contract'][2:]}-{t['contract'][:2]}"
+
+
+def group_stats(ts):
+    if not ts:
+        return None
+    psf = [t["price"] / (t["area_sqm"] * SQM_TO_SQFT) for t in ts if t["area_sqm"]]
+    price = [t["price"] for t in ts]
+    land = [t["area_sqm"] * SQM_TO_SQFT for t in ts]
+    return {"n": len(ts), "psf": round(statistics.median(psf)), "price": statistics.median(price),
+            "p25_price": pct(price, 0.25), "land_sqft": round(statistics.median(land))}
+
+
+def district_compare(store, det, gcb_ids, in_area_small, rows):
+    """GCB vs detached outside GCB areas vs semi-detached, same postal district, land $psf and price."""
+    semi = [t for t in store["tx"].values() if t.get("type") == "Semi-detached" and t.get("contract") and t.get("price")]
+    latest = max(ym_of(t) for t in det + semi)
+    y, m = int(latest[:4]), int(latest[5:])
+    cutoff = f"{y - 2}-{m:02d}"
+    gcb_d = {}
+    for t in det:
+        if id(t) in gcb_ids:
+            gcb_d.setdefault(t["district"], []).append(t)
+    out = {"latest": latest, "cutoff_24m": cutoff, "districts": []}
+    for d in sorted(gcb_d):
+        pins = [r for r in rows if r["district"] == d and not r["small"] and r["lat"] is not None]
+        rec = {"district": d, "lat": round(statistics.mean(r["lat"] for r in pins), 5) if pins else None,
+               "lon": round(statistics.mean(r["lon"] for r in pins), 5) if pins else None}
+        for win, keep in (("all", lambda t: True), ("24m", lambda t: ym_of(t) > cutoff)):
+            g = [t for t in gcb_d[d] if keep(t)]
+            o = [t for t in det if t["district"] == d and id(t) not in gcb_ids and id(t) not in in_area_small and keep(t)]
+            sd = [t for t in semi if t["district"] == d and keep(t)]
+            rec[win] = {"gcb": group_stats(g), "detached": group_stats(o), "semi": group_stats(sd)}
+        out["districts"].append(rec)
+    return out
 
 
 if __name__ == "__main__":
